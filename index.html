@@ -1,0 +1,1892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>R2R Portfolio X-Ray</title>
+<meta name="description" content="Your interactive portfolio dashboard — quality, allocation, risk and P&L at a glance. Prepared by R2R Tutorials.">
+<!-- Link preview (WhatsApp / Telegram / iMessage). The crawler only ever sees this base
+     page — the client's holdings live in the URL '#' fragment, which is never sent to any
+     server — so the preview card is always generic and leaks nothing. Optionally drop a
+     1200x630 image named og-preview.png next to this file to show a picture in the card. -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="R2R Tutorials">
+<meta property="og:title" content="Your Portfolio X-Ray is ready">
+<meta property="og:description" content="Tap to open your private, interactive portfolio dashboard — holdings, risk and P&L. Nothing is stored online; it opens straight in your browser.">
+<meta property="og:image" content="https://learn2earninvesting-maker.github.io/xray/og-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Your Portfolio X-Ray is ready">
+<meta name="twitter:description" content="Tap to open your private, interactive portfolio dashboard.">
+<meta name="twitter:image" content="https://learn2earninvesting-maker.github.io/xray/og-preview.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#04080f; --panel:#0b1220; --panel2:#0e1626; --line:#1c2636; --line2:#26324a;
+  --amber:#f0a500; --amber-soft:rgba(240,165,0,.12);
+  --emerald:#2ecc71; --blue:#5b8def; --red:#ff5c5c; --violet:#a274ff;
+  --txt:#e8edf4; --mut:#8494a8; --mut2:#5d6b80;
+  --r:14px; --mono:'JetBrains Mono',monospace; --disp:'Syne',sans-serif; --body:'DM Sans',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:var(--body);line-height:1.5;-webkit-font-smoothing:antialiased;padding-bottom:60px}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:
+  radial-gradient(900px 500px at 85% -5%,rgba(240,165,0,.06),transparent 60%),
+  radial-gradient(700px 500px at -5% 10%,rgba(91,141,239,.05),transparent 55%)}
+h1,h2,h3,.disp{font-family:var(--disp);letter-spacing:-.01em}
+.mono{font-family:var(--mono)}
+.mut{color:var(--mut)}
+a{color:var(--amber)}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+
+/* ---------- top bar ---------- */
+.topbar{position:sticky;top:0;z-index:40;background:rgba(4,8,15,.86);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.topbar .wrap{display:flex;align-items:center;gap:14px;height:62px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:800;font-size:1.05rem;white-space:nowrap}
+.brand .dot{width:11px;height:11px;border-radius:3px;background:var(--amber);box-shadow:0 0 14px var(--amber)}
+.brand small{font-family:var(--body);font-weight:500;color:var(--mut);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;margin-left:2px}
+.topbar .sp{flex:1}
+.tb-actions{display:flex;align-items:center;gap:8px}
+.asof{font-size:.72rem;color:var(--mut);font-family:var(--mono)}
+.asof b{color:var(--amber)}
+.btn{font-family:var(--body);font-weight:600;font-size:.82rem;border:1px solid var(--line2);background:var(--panel2);color:var(--txt);padding:9px 14px;border-radius:10px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+.btn:hover{border-color:var(--amber);color:#fff}
+.btn.primary{background:var(--amber);color:#0a0a0a;border-color:var(--amber)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.ghost{background:transparent}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.icon{width:16px;height:16px;flex:none}
+
+/* ---------- landing ---------- */
+.hero{padding:54px 0 26px;text-align:center}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.22em;text-transform:uppercase;color:var(--amber);margin-bottom:14px}
+.hero h1{font-size:clamp(2rem,5vw,3.1rem);line-height:1.05;font-weight:800;margin-bottom:16px}
+.hero h1 .u{color:var(--amber)}
+.hero p{max-width:560px;margin:0 auto;color:var(--mut);font-size:1.02rem}
+.drop{max-width:620px;margin:34px auto 0;border:1.5px dashed var(--line2);border-radius:20px;background:linear-gradient(180deg,var(--panel),rgba(11,18,32,.4));padding:44px 26px;text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.over{border-color:var(--amber);background:var(--amber-soft)}
+.drop .big{font-family:var(--disp);font-weight:700;font-size:1.25rem;margin:14px 0 6px}
+.drop .sub{color:var(--mut);font-size:.9rem}
+.drop .pick{margin-top:16px}
+.upicon{width:46px;height:46px;color:var(--amber);opacity:.9}
+.supports{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:22px}
+.chip{font-family:var(--mono);font-size:.7rem;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:5px 11px}
+.load{display:none;max-width:620px;margin:20px auto 0;text-align:center;color:var(--mut)}
+.spin{width:26px;height:26px;border:3px solid var(--line2);border-top-color:var(--amber);border-radius:50%;animation:sp 0.8s linear infinite;margin:0 auto 10px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.err{display:none;max-width:620px;margin:18px auto 0;background:rgba(255,92,92,.08);border:1px solid rgba(255,92,92,.35);color:#ffb4b4;border-radius:12px;padding:14px 16px;font-size:.88rem}
+
+/* ---------- section scaffolding ---------- */
+.app{display:none}
+.subnav{position:sticky;top:62px;z-index:30;background:rgba(4,8,15,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);overflow-x:auto}
+.subnav .wrap{display:flex;gap:4px;height:48px;align-items:center}
+.subnav a{font-family:var(--body);font-weight:600;font-size:.82rem;color:var(--mut);text-decoration:none;padding:7px 13px;border-radius:8px;white-space:nowrap;transition:.15s}
+.subnav a:hover{color:var(--txt);background:var(--panel2)}
+.subnav a.on{color:var(--amber);background:var(--amber-soft)}
+
+/* ---------- tabbed (horizontal) section view ---------- */
+.tabpager{position:sticky;top:110px;z-index:29;background:rgba(4,8,15,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.tabpager .wrap{display:flex;align-items:center;gap:10px;height:44px}
+.tabpager .pg-arrow{display:inline-flex;align-items:center;justify-content:center;width:34px;height:30px;border:1px solid var(--line2);background:var(--panel);color:var(--txt);border-radius:8px;cursor:pointer;flex:0 0 auto;transition:.15s}
+.tabpager .pg-arrow:hover:not(:disabled){background:var(--panel2);border-color:var(--amber)}
+.tabpager .pg-arrow:disabled{opacity:.32;cursor:default}
+.tabpager .pg-arrow svg{width:16px;height:16px;stroke:currentColor;stroke-width:2.4;fill:none}
+.tabpager .pg-label{flex:1 1 auto;text-align:center;min-width:0}
+.tabpager .pg-label .t{font-family:var(--disp);font-weight:700;font-size:.9rem;color:var(--txt);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;line-height:1.15}
+.tabpager .pg-label .c{font-family:var(--mono);font-size:.68rem;color:var(--mut);letter-spacing:.04em}
+.tab-viewport{overflow:hidden;touch-action:pan-y}
+.tab-track{display:flex;width:100%;transition:transform .34s cubic-bezier(.4,0,.2,1);will-change:transform}
+.tab-track>section{flex:0 0 100%;width:100%;max-width:100%;min-width:0;box-sizing:border-box;height:var(--tabh,70vh);overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;padding:20px 2px 40px;scrollbar-width:thin}
+.tab-track>section .chart-box{overflow:hidden}
+.tab-track>section .alloc-wrap{overflow-x:auto}
+.tab-track>section.pgbreak{margin:0}
+.tab-track>section::-webkit-scrollbar{width:8px}
+.tab-track>section::-webkit-scrollbar-thumb{background:var(--line2);border-radius:6px}
+.tab-track>section:not(.tab-live){pointer-events:none}
+.swipe-hint{display:none}
+@media (max-width:640px){
+  .tabpager{top:110px}
+  .tabpager .wrap{gap:8px}
+  .swipe-hint{display:block;text-align:center;font-size:.66rem;color:var(--mut2);font-family:var(--mono);padding:2px 0 0}
+}
+.uni-list{display:flex;flex-direction:column;gap:8px}
+.uni-row{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px}
+.uni-row.held{border-color:var(--amber);background:var(--amber-soft)}
+.uni-top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.uni-top .unm{font-weight:700;font-size:.92rem;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uni-top .unm .usym{color:var(--mut);font-family:var(--mono);font-weight:500;font-size:.78rem}
+.uni-meta{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 12px;font-size:.76rem;color:var(--mut);font-family:var(--mono)}
+.uni-meta b{color:var(--txt)}
+.uni-meta .held-chip{color:var(--amber);font-family:var(--body);font-weight:600}
+section{padding:30px 0 6px;scroll-margin-top:120px}
+.sec-h{display:flex;align-items:baseline;gap:12px;margin-bottom:6px}
+.sec-h h2{font-size:1.35rem;font-weight:700}
+.sec-h .n{font-family:var(--mono);color:var(--amber);font-size:.85rem}
+.sec-sub{color:var(--mut);font-size:.9rem;margin-bottom:20px;max-width:720px}
+
+/* ---------- KPI hero strip ---------- */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:8px}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px 16px 15px;position:relative;overflow:hidden}
+.kpi .lab{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.kpi .val{font-family:var(--mono);font-weight:700;font-size:1.7rem;line-height:1}
+.kpi .val.sm{font-size:1.3rem}
+.kpi .sub{font-size:.76rem;color:var(--mut);margin-top:6px}
+.kpi.hi{border-color:var(--line2)}
+.kpi.hi::after{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:var(--amber)}
+.pos{color:var(--emerald)} .neg{color:var(--red)} .amb{color:var(--amber)}
+
+/* concentration strip */
+.conc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.conc{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+.conc .k{font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em}
+.conc .v{font-family:var(--mono);font-weight:700;font-size:1.5rem;margin-top:6px;line-height:1}
+.conc .s{font-size:.72rem;color:var(--mut);margin-top:5px}
+.flag-line{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:4px}
+.flag{font-size:.76rem;padding:6px 11px;border-radius:8px;display:flex;align-items:center;gap:7px;border:1px solid}
+.flag.warn{background:rgba(255,92,92,.08);border-color:rgba(255,92,92,.32);color:#ffb4b4}
+.flag.ok{background:rgba(46,204,113,.08);border-color:rgba(46,204,113,.3);color:#9be8bf}
+.flag.note{background:var(--amber-soft);border-color:rgba(240,165,0,.32);color:#f4c869}
+.flag b{font-weight:700}
+
+/* allocation tables */
+.alloc-wrap{max-height:none}
+table.alloc{width:100%;border-collapse:collapse;font-size:.82rem}
+table.alloc td,table.alloc th{padding:8px 6px;text-align:right;border-bottom:1px solid var(--line)}
+table.alloc th{font-size:.66rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em;font-weight:600;text-align:right;border-bottom:1px solid var(--line2)}
+table.alloc td:first-child,table.alloc th:first-child{text-align:left}
+table.alloc tr:last-child td{border-bottom:none}
+.al-name{font-weight:600}
+.al-name .sym{font-family:var(--mono);font-size:.68rem;color:var(--mut);display:block;margin-top:1px}
+.al-bar{position:relative;min-width:90px}
+.al-bar .track{height:7px;background:var(--panel2);border-radius:4px;overflow:hidden;margin-top:4px}
+.al-bar .fill{height:100%;background:var(--amber);border-radius:4px}
+.al-bar .fill.v{background:var(--violet)}
+.al-pct{font-family:var(--mono);font-weight:700}
+.al-val{font-family:var(--mono);color:var(--mut)}
+table.alloc td.mono2{font-family:var(--mono)}
+
+/* quality & price check */
+.verdict-strip{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.verdict{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;border-left:4px solid var(--mut)}
+.verdict.g{border-left-color:var(--emerald)} .verdict.a{border-left-color:var(--amber)} .verdict.r{border-left-color:var(--red)}
+.verdict .k{font-size:.72rem;color:var(--mut);text-transform:uppercase;letter-spacing:.07em}
+.verdict .v{font-family:var(--disp);font-weight:700;font-size:1.5rem;margin:6px 0 4px}
+.verdict.g .v{color:var(--emerald)} .verdict.a .v{color:var(--amber)} .verdict.r .v{color:var(--red)}
+.verdict .s{font-size:.82rem;color:var(--mut);line-height:1.45}
+.qv-list{display:flex;flex-direction:column;gap:10px}
+.qv-row{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:auto 1.4fr auto auto 2fr;gap:14px;align-items:center;break-inside:avoid}
+.qv-rank{font-family:var(--mono);font-weight:700;font-size:1.05rem;color:var(--amber);min-width:30px;text-align:center}
+.qv-rank.na{color:var(--mut2);font-size:.9rem}
+.qv-peg{font-family:var(--mono);font-weight:700;color:var(--amber)}
+.qv-row .stock{min-width:0}
+.qv-row .snm{font-family:var(--disp);font-weight:700;font-size:.98rem;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.qv-row .snums{font-family:var(--mono);font-size:.72rem;color:var(--mut);margin-top:3px}
+.pill{display:inline-flex;flex-direction:column;align-items:center;gap:3px;min-width:74px;text-align:center}
+.pill .pl{font-size:.62rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.pill .pv{font-size:.86rem;font-weight:700;padding:3px 10px;border-radius:20px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.pv.g{background:rgba(46,204,113,.14);color:var(--emerald)}
+.pv.a{background:rgba(240,165,0,.16);color:var(--amber)}
+.pv.r{background:rgba(255,92,92,.14);color:var(--red)}
+.pv.m{background:rgba(132,148,168,.14);color:var(--mut)}
+.qv-take{font-size:.86rem;color:var(--txt);line-height:1.45}
+.qv-key{display:flex;flex-wrap:wrap;gap:8px 22px;margin-top:16px;font-size:.78rem;color:var(--mut)}
+.qv-key span{display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;flex:none;display:inline-block}
+.dot.g{background:var(--emerald)} .dot.r{background:var(--red)} .dot.a{background:var(--amber)}
+@media(max-width:680px){
+  .verdict-strip{grid-template-columns:1fr}
+  .qv-row{grid-template-columns:auto 1fr 1fr;gap:10px 12px}
+  .qv-row .stock{grid-column:2/-1}
+  .qv-rank{grid-row:1/3}
+  .qv-take{grid-column:1/-1}
+}
+
+/* ---------- cards / charts ---------- */
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(2,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.card h3{font-size:.95rem;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.card .desc{font-size:.78rem;color:var(--mut);margin-bottom:14px}
+.chart-box{position:relative;height:240px}
+.chart-box.tall{height:300px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 16px;margin-top:12px;font-size:.76rem}
+.legend span{display:flex;align-items:center;gap:6px;color:var(--mut)}
+.legend i{width:10px;height:10px;border-radius:3px;flex:none}
+
+/* ---------- holdings ---------- */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;align-items:center}
+.seg{display:flex;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{font-family:var(--body);font-weight:600;font-size:.78rem;background:transparent;border:none;color:var(--mut);padding:6px 12px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--amber);color:#0a0a0a}
+.hold-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px}
+.hcard{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:16px;position:relative;transition:.15s;break-inside:avoid}
+.hcard:hover{border-color:var(--line2)}
+.hcard.out{border-style:dashed;opacity:.92}
+.hc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.hc-name{font-family:var(--disp);font-weight:700;font-size:1.02rem;line-height:1.15}
+.hc-sym{font-family:var(--mono);font-size:.72rem;color:var(--mut);margin-top:3px}
+.hc-ind{font-size:.7rem;color:var(--mut2);margin-top:4px}
+.badge{font-family:var(--mono);font-size:.64rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:4px 8px;border-radius:6px;white-space:nowrap}
+.b-out{background:rgba(162,116,255,.14);color:var(--violet)}
+.b-under{background:rgba(255,92,92,.14);color:var(--red)}
+.b-consol{background:rgba(91,141,239,.14);color:var(--blue)}
+.b-accum{background:rgba(240,165,0,.16);color:var(--amber)}
+.b-uncov{background:rgba(132,148,168,.14);color:var(--mut)}
+/* ---------- tier legend (coverage tab) ---------- */
+.tier-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin:2px 0 18px}
+.tier-card{border:1px solid var(--line);border-radius:10px;padding:11px 12px;background:rgba(255,255,255,.015);border-left:3px solid var(--mut)}
+.tier-card.t-strong{border-left-color:var(--violet)}
+.tier-card.t-solid{border-left-color:var(--blue)}
+.tier-card.t-watch{border-left-color:var(--amber)}
+.tier-card.t-weak{border-left-color:var(--red)}
+.tier-card.t-uncov{border-left-color:var(--mut)}
+.tier-card .tc-h{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.tier-card .tc-band{font-family:var(--mono);font-size:.6rem;color:var(--mut);letter-spacing:.03em}
+.tier-card .tc-def{font-size:.76rem;line-height:1.45;color:var(--txt2,#c7d0dc)}
+.legend-lead{font-size:.78rem;color:var(--mut);margin:0 0 10px;line-height:1.5}
+/* ---------- mini stat strip (promoter / ema tabs) ---------- */
+.mini-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:2px 0 16px}
+.mini-stat{border:1px solid var(--line);border-radius:10px;padding:11px 13px;background:var(--panel)}
+.mini-stat .ms-lab{font-size:.68rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px}
+.mini-stat .ms-val{font-family:var(--disp);font-weight:800;font-size:1.35rem;line-height:1}
+.mini-stat .ms-sub{font-size:.7rem;color:var(--mut);margin-top:4px}
+/* ---------- promoter rows ---------- */
+.pr-metrics{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:.76rem;color:var(--mut);font-family:var(--mono)}
+.pr-metrics b{color:var(--txt)}
+.pr-metrics .up{color:var(--emerald)} .pr-metrics .dn{color:var(--red)}
+.pledge-chip{color:var(--red);font-family:var(--body);font-weight:600}
+/* ---------- 40W EMA split ---------- */
+.ema-split{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:4px}
+.ema-col{border:1px solid var(--line);border-radius:12px;padding:13px;background:var(--panel)}
+.ema-col.above{border-top:3px solid var(--emerald)}
+.ema-col.below{border-top:3px solid var(--red)}
+.ema-col h4{font-size:.9rem;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:7px}
+.ema-col .ec-sub{font-size:.72rem;color:var(--mut);margin-bottom:11px}
+.ema-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.ema-item:last-child{border-bottom:none}
+.ema-item .ei-nm{font-size:.82rem;font-weight:600;color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ema-item .ei-nm .ei-sym{color:var(--mut);font-family:var(--mono);font-weight:500;font-size:.72rem;margin-left:5px}
+.ema-item .ei-nm.held-mark{color:var(--amber)}
+.ema-item .ei-d{font-family:var(--mono);font-size:.78rem;white-space:nowrap;font-weight:600}
+.ema-item .ei-d.up{color:var(--emerald)} .ema-item .ei-d.dn{color:var(--red)}
+.ema-empty{font-size:.78rem;color:var(--mut2);padding:8px 0;font-style:italic}
+@media(max-width:640px){.ema-split{grid-template-columns:1fr}}
+.hc-weight{position:absolute;top:0;left:0;height:3px;background:var(--amber);border-radius:14px 0 0 0}
+.pnlrow{display:flex;gap:14px;margin-bottom:12px;flex-wrap:wrap}
+.pnlrow .b{font-family:var(--mono)}
+.pnlrow .k{font-size:.66rem;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+.pnlrow .v{font-size:.98rem;font-weight:700;margin-top:2px}
+.mrow{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px 10px;margin:12px 0;padding:12px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.mrow .m .k{font-size:.62rem;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+.mrow .m .v{font-family:var(--mono);font-size:.92rem;font-weight:600;margin-top:2px}
+.hc-radar{height:150px;position:relative;margin-top:4px}
+.hc-signal{font-size:.82rem;color:var(--txt);margin-top:12px;padding-top:12px;border-top:1px solid var(--line);line-height:1.5}
+.hc-signal .tag{font-family:var(--mono);font-size:.62rem;color:var(--mut);text-transform:uppercase;letter-spacing:.06em;display:block;margin-bottom:5px}
+.smart{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.smart span{font-family:var(--mono);font-size:.66rem;padding:3px 7px;border-radius:5px;background:var(--panel2);border:1px solid var(--line);color:var(--mut)}
+.na{color:var(--mut2)}
+
+/* ---------- coverage refresh modal ---------- */
+.modal{display:none;position:fixed;inset:0;z-index:60;background:rgba(2,4,8,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:18px}
+.modal.on{display:flex}
+.modal-in{background:var(--panel);border:1px solid var(--line2);border-radius:18px;max-width:520px;width:100%;padding:24px}
+.modal-in h3{font-size:1.15rem;margin-bottom:6px}
+.modal-in p{color:var(--mut);font-size:.86rem;margin-bottom:16px}
+.cov-drop{border:1.5px dashed var(--line2);border-radius:12px;padding:26px;text-align:center;cursor:pointer;color:var(--mut);font-size:.88rem}
+.cov-drop:hover{border-color:var(--amber);color:var(--txt)}
+.cov-status{font-family:var(--mono);font-size:.8rem;margin-top:14px;color:var(--emerald)}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.field{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.field label{font-size:.82rem;color:var(--mut);white-space:nowrap}
+.field input{background:var(--panel2);border:1px solid var(--line2);color:var(--txt);border-radius:8px;padding:8px 11px;font-family:var(--mono);font-size:.85rem;flex:1}
+
+/* ---------- footer / disclaimer ---------- */
+.disclaim{margin-top:36px;border-top:1px solid var(--line);padding:22px 0 10px;color:var(--mut2);font-size:.76rem;line-height:1.6}
+.disclaim b{color:var(--mut)}
+.print-only{display:none}
+
+/* toast + shared banner */
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:#0e1626;border:1px solid var(--line2);color:var(--txt);padding:12px 18px;border-radius:12px;font-size:.86rem;box-shadow:0 12px 40px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.25s;z-index:80;display:flex;align-items:center;gap:10px;max-width:90vw}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast .ok{color:var(--emerald);font-weight:700}
+.toast .warn{color:var(--amber)}
+.shared-banner{background:var(--amber-soft);border-bottom:1px solid rgba(240,165,0,.3);font-size:.82rem;color:#f4c869;padding:9px 0}
+.shared-banner .wrap{display:flex;align-items:center;gap:10px}
+.shared-banner b{color:#fff}
+
+@media(max-width:820px){
+  .g2,.g3{grid-template-columns:1fr}
+  .topbar .wrap{gap:8px}
+  .asof{display:none}
+  .brand small{display:none}
+}
+
+/* ================= PRINT / PDF ================= */
+@media print{
+  @page{size:A4;margin:12mm}
+  body{background:#fff;color:#14181f;padding:0}
+  body::before{display:none}
+  .topbar,.subnav,.tabpager,.drop,.load,.err,.filters,.tb-actions,.modal,.no-print{display:none!important}
+  .app{display:block!important}
+  /* unwind the horizontal tab view for print — every section stacks vertically */
+  .tab-viewport{overflow:visible!important}
+  .tab-track{display:block!important;transform:none!important}
+  .tab-track>section{height:auto!important;overflow:visible!important;width:auto!important;max-width:100%!important;padding:10px 0!important}
+  .wrap{max-width:100%;padding:0}
+  .print-only{display:block}
+  section{padding:10px 0;page-break-inside:auto}
+  .card,.kpi,.hcard{background:#fff;border:1px solid #d7dde6;box-shadow:none;color:#14181f}
+  .kpi .lab,.card .desc,.hc-sym,.mut,.sec-sub{color:#5a6472}
+  .hcard{break-inside:avoid;page-break-inside:avoid}
+  .hold-grid{grid-template-columns:1fr 1fr}
+  .sec-h h2,.hc-name{color:#14181f}
+  .kpi .val,.pnlrow .v{color:#14181f}
+  .pos{color:#128a4b!important}.neg{color:#c0392b!important}.amb{color:#b47f00!important}
+  .chart-box{height:210px}.hc-radar{height:130px}
+  .pgbreak{page-break-before:always}
+  .print-cover{display:block!important}
+}
+.print-cover{display:none}
+</style>
+</head>
+<body>
+
+<!-- ================= TOP BAR ================= -->
+<div class="topbar">
+  <div class="wrap">
+    <div class="brand"><span class="dot"></span>R2R&nbsp;X-Ray<small>Portfolio&nbsp;Desk</small></div>
+    <div class="sp"></div>
+    <div class="tb-actions">
+      <span class="asof" id="asofTop"></span>
+      <button class="btn ghost no-print" id="btnCoverage" title="Update coverage data">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v18M3 12h18" stroke-linecap="round"/></svg>
+        <span class="hide-sm">Coverage</span>
+      </button>
+      <button class="btn ghost no-print" id="btnNew" style="display:none">New file</button>
+      <button class="btn ghost no-print" id="btnShare" style="display:none" title="Copy a link that opens this exact dashboard">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a3 3 0 10-2.83-4M6 12a3 3 0 100 0m12 4a3 3 0 10-2.83 4M8.6 13.5l6.8 3.5M15.4 6.5L8.6 10" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="hide-sm">Copy link</span>
+      </button>
+      <button class="btn primary no-print" id="btnPdf" style="display:none">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V3h12v6M6 18h12v3H6zM6 14h12" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="9" width="16" height="7" rx="1"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= LANDING ================= -->
+<div id="landing">
+  <div class="wrap">
+    <div class="hero">
+      <div class="eyebrow">R2R Research Desk · Coverage Overlay</div>
+      <h1>See your holdings through<br>the <span class="u">research lens</span>.</h1>
+      <p>Upload your broker holdings file. We match each stock against the research desk's covered universe and X-ray your portfolio — valuation, quality, growth, momentum and smart-money flows — with a signal on every position.</p>
+
+      <div class="drop" id="drop">
+        <svg class="upicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 16V4m0 0L7 9m5-5l5 5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 17v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke-linecap="round"/></svg>
+        <div class="big">Drop your holdings file here</div>
+        <div class="sub">or click to browse — CSV or Excel from Zerodha, Groww, Upstox &amp; more</div>
+        <div class="pick"><span class="btn primary">Choose file</span></div>
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden>
+      </div>
+      <div class="supports">
+        <span class="chip">Zerodha Console</span><span class="chip">Groww</span><span class="chip">Upstox</span><span class="chip">Generic CSV/XLSX</span><span class="chip">100% on-device</span>
+      </div>
+      <div class="load" id="load"><div class="spin"></div>Reading your portfolio…</div>
+      <div class="err" id="err"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APP ================= -->
+<div class="app" id="app">
+  <div class="shared-banner no-print" id="sharedBanner" style="display:none">
+    <div class="wrap">🔗 <span>You're viewing a portfolio dashboard shared by your research desk. <b>Nothing you see is stored online</b> — it's rebuilt from the link in your browser.</span></div>
+  </div>
+  <!-- print cover -->
+  <div class="print-cover print-cover-block wrap" style="padding-top:8px">
+    <div style="border-bottom:2px solid #f0a500;padding-bottom:10px;margin-bottom:6px">
+      <div style="font-family:var(--mono);font-size:.7rem;letter-spacing:.2em;color:#b47f00">R2R RESEARCH DESK · PORTFOLIO X-RAY</div>
+      <div style="font-family:var(--disp);font-weight:800;font-size:1.6rem;margin-top:4px" id="coverTitle">Portfolio Coverage Report</div>
+      <div class="mut" id="coverMeta" style="font-size:.8rem;margin-top:4px"></div>
+    </div>
+  </div>
+
+  <div class="subnav no-print">
+    <div class="wrap">
+      <a href="#s-overview" class="on">Overview</a>
+      <a href="#s-alloc">Allocation</a>
+      <a href="#s-quality">Quality &amp; Value</a>
+      <a href="#s-momentum">Momentum</a>
+      <a href="#s-holdings">Holdings</a>
+      <a href="#s-promoter">Promoter</a>
+      <a href="#s-ema">40W Trend</a>
+      <a href="#s-universe">Coverage</a>
+    </div>
+  </div>
+
+  <div class="tabpager no-print" id="tabpager">
+    <div class="wrap">
+      <button class="pg-arrow" id="pgPrev" aria-label="Previous section">
+        <svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="pg-label">
+        <span class="t" id="pgTitle">Portfolio overview</span>
+        <span class="c" id="pgCount">01 / 08</span>
+      </div>
+      <button class="pg-arrow" id="pgNext" aria-label="Next section">
+        <svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+    <div class="swipe-hint">‹ swipe to move between sections ›</div>
+  </div>
+
+  <div class="wrap">
+   <div class="tab-viewport" id="tabViewport">
+    <div class="tab-track" id="tabTrack">
+
+    <!-- OVERVIEW -->
+    <section id="s-overview" class="tab-live">
+      <div class="sec-h"><span class="n">01</span><h2>Portfolio overview</h2></div>
+      <div class="sec-sub" id="ovSub"></div>
+      <div class="kpi-grid" id="kpiGrid"></div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h3>Coverage health mix</h3>
+          <div class="desc">Value-weighted split of your covered holdings by overall health tier (Strong / Solid / Watch / Weak).</div>
+          <div class="chart-box"><canvas id="cStatus"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>What's driving your P&amp;L</h3>
+          <div class="desc">Rupee gain/loss contributed by each holding. A few names usually drive the book.</div>
+          <div class="chart-box"><canvas id="cPnlContrib"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ALLOCATION -->
+    <section id="s-alloc" class="pgbreak">
+      <div class="sec-h"><span class="n">02</span><h2>Allocation &amp; concentration</h2></div>
+      <div class="sec-sub">Exactly where your money sits — every position and every sector as a share of your current value — and how concentrated the book is.</div>
+
+      <!-- concentration strip -->
+      <div class="conc-grid" id="concGrid"></div>
+      <div class="flag-line" id="flagLine"></div>
+
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h3>Stock allocation</h3>
+          <div class="desc">Each holding as a % of total current value, largest first.</div>
+          <div class="alloc-wrap"><table class="alloc" id="tblStock"></table></div>
+        </div>
+        <div class="card">
+          <h3>Sector allocation</h3>
+          <div class="desc">Portfolio split by industry, with the exact weight in each.</div>
+          <div class="chart-box" style="height:190px;margin-bottom:6px"><canvas id="cSector"></canvas></div>
+          <div class="alloc-wrap"><table class="alloc" id="tblSector"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUALITY & VALUE -->
+    <section id="s-quality" class="pgbreak">
+      <div class="sec-h"><span class="n">03</span><h2>Quality &amp; price check</h2></div>
+      <div class="sec-sub">Two simple questions for every stock: is it a <b>good business</b>, and is the <b>price fair for the growth</b> you're getting? Stocks are ranked by <b>PEG</b> — the price you pay for each unit of growth. <b>Lower is better.</b></div>
+      <div class="verdict-strip" id="qvVerdict"></div>
+      <div class="qv-list" id="qvList"></div>
+      <div class="qv-key">
+        <span><i class="dot g"></i> <b>PEG under 1</b> = undervalued for its growth · <b>1–2</b> = fair · <b>over 2</b> = expensive for the growth.</span>
+        <span><i class="dot a"></i> PEG = P/E ÷ earnings growth. It fixes the flaw in P/E — a high P/E is fine if growth is high.</span>
+      </div>
+    </section>
+
+    <!-- MOMENTUM -->
+    <section id="s-momentum" class="pgbreak">
+      <div class="sec-h"><span class="n">04</span><h2>Momentum &amp; flows</h2></div>
+      <div class="sec-sub">How each holding has performed against its own sector over the past year, and where institutional money has moved.</div>
+      <div class="grid g2">
+        <div class="card">
+          <h3>1-year return vs sector</h3>
+          <div class="desc">Price return over the trailing year, measured against the stock's own industry (above 0 = beat its sector).</div>
+          <div class="chart-box tall"><canvas id="cRet"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Smart-money direction (past year)</h3>
+          <div class="desc">Net change in FII + DII holding over the last year.</div>
+          <div class="chart-box tall"><canvas id="cFlow"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HOLDINGS -->
+    <section id="s-holdings" class="pgbreak">
+      <div class="sec-h"><span class="n">05</span><h2>Holding-by-holding X-ray</h2></div>
+      <div class="sec-sub">Every position with your P&amp;L, its health tier, key fundamentals, a four-factor profile and a plain-language read.</div>
+      <div class="filters no-print">
+        <div class="seg" id="segFilter">
+          <button data-f="all" class="on">All</button>
+          <button data-f="covered">Covered</button>
+          <button data-f="out">Outside coverage</button>
+        </div>
+        <div class="seg" id="segSort">
+          <button data-s="weight" class="on">By weight</button>
+          <button data-s="pnl">By P&amp;L</button>
+          <button data-s="score">By health</button>
+        </div>
+      </div>
+      <div class="hold-grid" id="holdGrid"></div>
+    </section>
+
+    <!-- PROMOTER HOLDING -->
+    <section id="s-promoter" class="pgbreak">
+      <div class="sec-h"><span class="n">06</span><h2>Promoter holding &amp; conviction</h2></div>
+      <div class="sec-sub" id="promSub"></div>
+      <p class="legend-lead">Promoters are a company's founders/owners. A high stake means their own money rides with yours; promoters <b>adding</b> is generally read as insider confidence, while promoters <b>trimming</b> or <b>pledging</b> shares is worth watching. This is context, not advice. Covered holdings only.</p>
+      <div class="mini-stats" id="promStats"></div>
+      <div class="card" style="margin-bottom:16px">
+        <h3>Promoter stake across your covered holdings</h3>
+        <div class="desc">Latest promoter holding % — taller is more owner skin-in-the-game. Amber marks a stake that fell over the past year.</div>
+        <div class="chart-box tall"><canvas id="cProm"></canvas></div>
+      </div>
+      <div class="uni-list" id="promList"></div>
+    </section>
+
+    <!-- 40-WEEK EMA TREND -->
+    <section id="s-ema" class="pgbreak">
+      <div class="sec-h"><span class="n">07</span><h2>40-week EMA trend</h2></div>
+      <div class="sec-sub" id="emaSub"></div>
+      <p class="legend-lead">The 40-week EMA (≈200-day) is a widely-used long-term trend line. A stock trading <b>above</b> it is generally in a longer-term uptrend; <b>below</b> it, a downtrend. It's a trend filter for context — not a buy or sell signal. Prices and the EMA are both from the coverage snapshot date.</p>
+      <div class="mini-stats" id="emaStats"></div>
+      <div class="grid g2" style="margin-bottom:18px">
+        <div class="card">
+          <h3>Your covered book vs 40W EMA</h3>
+          <div class="desc">Share of your covered holdings' value trading above vs below their 40-week EMA.</div>
+          <div class="chart-box"><canvas id="cEma"></canvas></div>
+        </div>
+        <div class="card">
+          <h3>Coverage universe vs 40W EMA</h3>
+          <div class="desc">How the full research universe splits — a read on the broader trend backdrop.</div>
+          <div class="chart-box"><canvas id="cEmaUni"></canvas></div>
+        </div>
+      </div>
+      <h3 style="font-size:.95rem;font-weight:700;margin:0 0 3px">Your holdings by trend</h3>
+      <div class="desc" style="font-size:.78rem;color:var(--mut);margin-bottom:12px">Distance shown is how far the price sits from its 40-week EMA.</div>
+      <div class="ema-split" id="emaSplitHold"></div>
+      <h3 style="font-size:.95rem;font-weight:700;margin:22px 0 3px">Full coverage universe by trend</h3>
+      <div class="desc" style="font-size:.78rem;color:var(--mut);margin-bottom:12px">Every covered stock, split by trend. <span style="color:var(--amber)">Amber</span> names are in your portfolio.</div>
+      <div class="ema-split" id="emaSplitUni"></div>
+    </section>
+
+    <!-- COVERAGE UNIVERSE -->
+    <section id="s-universe" class="pgbreak">
+      <div class="sec-h"><span class="n">08</span><h2>Coverage universe</h2></div>
+      <div class="sec-sub" id="uniSub"></div>
+      <p class="legend-lead">Every stock below carries a <b>health tier</b> — a single label summarising how it screens across quality, valuation, growth, momentum and institutional activity. Here's what each one means:</p>
+      <div class="tier-legend">
+        <div class="tier-card t-strong">
+          <div class="tc-h"><span class="badge b-out">Strong</span><span class="tc-band">Health 68–100</span></div>
+          <div class="tc-def">Top of our coverage. Screens well right across the board — sound fundamentals, healthy growth and a reasonable valuation all line up.</div>
+        </div>
+        <div class="tier-card t-solid">
+          <div class="tc-h"><span class="badge b-consol">Solid</span><span class="tc-band">Health 54–67</span></div>
+          <div class="tc-def">Fundamentally healthy with no major red flags. A dependable name that screens well overall, just short of the top band.</div>
+        </div>
+        <div class="tier-card t-watch">
+          <div class="tc-h"><span class="badge b-accum">Watch</span><span class="tc-band">Health 42–53</span></div>
+          <div class="tc-def">Mixed signals — worth keeping an eye on. Usually a soft metric, a stretched valuation, or slowing growth pulling the score down.</div>
+        </div>
+        <div class="tier-card t-weak">
+          <div class="tc-h"><span class="badge b-under">Weak</span><span class="tc-band">Health below 42</span></div>
+          <div class="tc-def">Weakest in our coverage. Several metrics screen poorly at the moment — read the desk note for the specific reasons.</div>
+        </div>
+        <div class="tier-card t-uncov">
+          <div class="tc-h"><span class="badge b-uncov">In coverage</span><span class="tc-band">Not scored</span></div>
+          <div class="tc-def">Tracked by the desk, but key fundamentals weren't disclosed in the latest scan, so no health score could be computed.</div>
+        </div>
+      </div>
+      <div class="uni-list" id="uniList"></div>
+
+      <div class="disclaim">
+        <b>Educational use only — not investment advice.</b> This report is generated from a research watchlist for educational and informational purposes as part of R2R Tutorials. It is not a recommendation to buy, sell or hold any security and does not constitute investment advice under the SEBI (Investment Advisers) Regulations, 2013. Figures are drawn from third-party stock-scan data (Tickertape) as of the coverage date shown and may be delayed, incomplete or revised; positions marked <b>NA</b> or <b>outside coverage</b> were not disclosed in the source data. Verify all figures independently and consult a SEBI-registered adviser before acting. Past performance is not indicative of future returns.
+        <div style="margin-top:8px" id="footMeta"></div>
+      </div>
+    </section>
+
+    </div><!-- /tab-track -->
+   </div><!-- /tab-viewport -->
+  </div>
+</div>
+
+<!-- ================= COVERAGE MODAL ================= -->
+<div class="modal" id="modal">
+  <div class="modal-in">
+    <h3>Update coverage data</h3>
+    <p><b>Preview only (this browser).</b> Drop the consolidated R2R watchlist CSV to try new coverage on your own screen. To update coverage for <b>everyone</b> (all client links, all devices), replace the <code>coverage.csv</code> file in your GitHub repo instead — the app reloads it automatically on open.</p>
+    <div class="field">
+      <label>Coverage as-of date</label>
+      <input type="text" id="covDate" placeholder="e.g. Q1 FY27 · Jul 2026">
+    </div>
+    <div class="cov-drop" id="covDrop">
+      Drop Tickertape CSV files here, or click to browse
+      <input type="file" id="covInput" accept=".csv" multiple hidden>
+    </div>
+    <div class="cov-status" id="covStatus"></div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="covReset">Reset to default</button>
+      <button class="btn" id="covClose">Close</button>
+      <button class="btn primary" id="covSave">Save coverage</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<input type="text" id="clipHelper" style="position:fixed;left:-9999px;opacity:0" aria-hidden="true">
+
+<script>
+/* ============================================================
+   R2R Portfolio X-Ray  —  self-contained overlay engine
+   ============================================================ */
+const DEFAULT_WATCHLIST = [{"companyId":"BSE:VIYASH","Name":"Viyash Scientific Ltd","Market Capitalization":10965.57,"Close Price":251.0,"Industry":"Pharma - Animal","Price To Earnings":63.71,"Price To Sales":3.21,"Revenue":3420.31,"Revenue Growth TTM":76.8,"PAT Growth TTM":231.74,"Price To Earnings Median 5 Years":84.62,"PEG":3.85,"Price To Earnings Median 3 Years":88.9,"Industry PE Median":41.22,"Industry PS Median":3.95,"EV To EBITDA":17.29,"CFO To PAT":143.74,"Debt To Equity":0.17,"Days Receivable":111.54,"Days Receivable 3 Years Back":87.59,"EMA 40W":225.51,"Returns Vs Industry 1Y":-35.25,"Returns Vs Industry 3Y":19.12,"CWIP":70.46,"Debt":489.75,"Debt 3 Years Back":443.6,"Operating Cash Flow":322.91,"Operating Cash Flow 1 Year Back":344.8,"EPS":3.94,"PAT Growth QoQ":36.81,"PAT Growth YoY":539.5,"PAT Growth 3 Years":56.62,"EPS Growth QoQ":34.83,"EPS Growth YoY":224.32,"EPS Growth 3 Years":41.58,"EPS Growth 5 Years":1.11,"Promoter Holdings":61.31,"DII Holdings":3.75,"FII Holdings":4.5,"Change In DII Holdings 1 Year":-9.23,"Change In DII Holdings 3 Years":0.84,"Change In FII Holdings 1 Year":-1.65,"Change In FII Holdings 3 Years":-1.76,"Change In Promoter Holdings 1 Year":8.7,"Change In Promoter Holdings 3 Years":8.52,"Equity Shares":436875477.0,"Fixed Assets":2104.67,"Fixed Assets 3 Years Back":609.2,"EMA 20D":267.39,"EMA 50D":257.88,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":224.65,"PAT 1 Year Back":15.77,"PAT 3 Years Back":-121.98,"PAT Latest Quarter":66.38,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"VIYASH","exchange":"BSE","isETF":false},{"companyId":"NSE:VISHNU","Name":"Vishnu Chemicals Ltd","Market Capitalization":4257.02,"Close Price":632.4,"Industry":"Speciality Chemicals","Price To Earnings":29.86,"Price To Sales":2.64,"Revenue":1609.7,"Revenue Growth TTM":11.28,"PAT Growth TTM":12.33,"Price To Earnings Median 5 Years":22.56,"PEG":0.91,"Price To Earnings Median 3 Years":24.61,"Industry PE Median":34.28,"Industry PS Median":4.56,"EV To EBITDA":18.25,"CFO To PAT":89.36,"Debt To Equity":0.49,"Days Receivable":70.37,"Days Receivable 3 Years Back":47.48,"EMA 40W":552.46,"Returns Vs Industry 1Y":13.27,"Returns Vs Industry 3Y":16.61,"CWIP":159.28,"Debt":527.23,"Debt 3 Years Back":379.4,"Operating Cash Flow":127.13,"Operating Cash Flow 1 Year Back":90.23,"EPS":21.18,"PAT Growth QoQ":28.55,"PAT Growth YoY":11.45,"PAT Growth 3 Years":1.37,"EPS Growth QoQ":29.28,"EPS Growth YoY":11.51,"EPS Growth 3 Years":-2.45,"EPS Growth 5 Years":29.61,"Promoter Holdings":69.21,"DII Holdings":5.94,"FII Holdings":2.51,"Change In DII Holdings 1 Year":0.52,"Change In DII Holdings 3 Years":5.94,"Change In FII Holdings 1 Year":-0.23,"Change In FII Holdings 3 Years":2.05,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":-5.79,"Equity Shares":67315284.0,"Fixed Assets":835.55,"Fixed Assets 3 Years Back":464.66,"EMA 20D":617.77,"EMA 50D":603.6,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":142.27,"PAT 1 Year Back":126.64,"PAT 3 Years Back":136.56,"PAT Latest Quarter":43.4,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"VISHNU","exchange":"NSE","isETF":false},{"companyId":"BSE:VENUSPIPES","Name":"Venus Pipes & Tubes Ltd","Market Capitalization":3526.09,"Close Price":1702.1,"Industry":"Steel - Tubes/Pipes","Price To Earnings":34.25,"Price To Sales":3.02,"Revenue":1166.85,"Revenue Growth TTM":21.73,"PAT Growth TTM":9.75,"Price To Earnings Median 5 Years":33.65,"PEG":1.01,"Price To Earnings Median 3 Years":33.7,"Industry PE Median":22.77,"Industry PS Median":1.42,"EV To EBITDA":19.18,"CFO To PAT":110.26,"Debt To Equity":0.29,"Days Receivable":81.29,"Days Receivable 3 Years Back":46.57,"EMA 40W":1380.72,"Returns Vs Industry 1Y":-0.17,"Returns Vs Industry 3Y":-1.93,"CWIP":123.67,"Debt":196.41,"Debt 3 Years Back":90.46,"Operating Cash Flow":112.42,"Operating Cash Flow 1 Year Back":68.66,"EPS":49.7,"PAT Growth QoQ":-0.43,"PAT Growth YoY":7.55,"PAT Growth 3 Years":32.12,"EPS Growth QoQ":-0.64,"EPS Growth YoY":6.27,"EPS Growth 3 Years":29.88,"EPS Growth 5 Years":12.84,"Promoter Holdings":48.41,"DII Holdings":17.81,"FII Holdings":2.63,"Change In DII Holdings 1 Year":2.85,"Change In DII Holdings 3 Years":9.08,"Change In FII Holdings 1 Year":-2.3,"Change In FII Holdings 3 Years":-3.86,"Change In Promoter Holdings 1 Year":0.29,"Change In Promoter Holdings 3 Years":0.21,"Equity Shares":20716110.0,"Fixed Assets 3 Years Back":59.86,"EMA 20D":1710.1,"EMA 50D":1592.55,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":101.96,"PAT 1 Year Back":92.89,"PAT 3 Years Back":44.21,"PAT Latest Quarter":25.5,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"VENUSPIPES","exchange":"BSE","isETF":false},{"companyId":"NSE:UFBL","Name":"United Foodbrands Ltd","Market Capitalization":2637.74,"Close Price":674.85,"Industry":"Quick Service Restaurant - QSR","Price To Sales":1.97,"Revenue":1338.7,"Revenue Growth TTM":8.57,"PAT Growth TTM":-129.04,"Price To Earnings Median 5 Years":123.65,"Price To Earnings Median 3 Years":149.87,"Industry PE Median":142.75,"Industry PS Median":2.22,"EV To EBITDA":17.78,"CFO To PAT":-360.14,"Debt To Equity":0.43,"Days Receivable":0.84,"Days Receivable 3 Years Back":2.18,"EMA 40W":412.87,"Returns Vs Industry 1Y":126.12,"Returns Vs Industry 3Y":11.71,"CWIP":13.62,"Debt":134.43,"Debt 3 Years Back":684.5,"Operating Cash Flow":222.96,"Operating Cash Flow 1 Year Back":193.35,"EPS":-15.14,"PAT Growth QoQ":-96.74,"PAT Growth YoY":26.92,"PAT Growth 3 Years":-73.62,"EPS Growth QoQ":-88.46,"EPS Growth YoY":33.78,"EPS Growth 3 Years":-76.11,"EPS Growth 5 Years":8.65,"Promoter Holdings":34.61,"DII Holdings":17.22,"FII Holdings":10.55,"Change In DII Holdings 1 Year":-2.71,"Change In DII Holdings 3 Years":-7.28,"Change In FII Holdings 1 Year":0.41,"Change In FII Holdings 3 Years":-7.42,"Change In Promoter Holdings 1 Year":0.87,"Change In Promoter Holdings 3 Years":0.82,"Equity Shares":39086387.0,"Fixed Assets":1160.78,"Fixed Assets 3 Years Back":1011.62,"EMA 20D":677.3,"EMA 50D":597.55,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":-61.91,"PAT 1 Year Back":-27.04,"PAT 3 Years Back":19.15,"PAT Latest Quarter":-15.07,"Pledged Percentage 1 Year Back":4.76,"Change In Promoter Holdings Latest Quarter":0.02,"symbol":"UFBL","exchange":"NSE","isETF":false},{"companyId":"NSE:TIMETECHNO","Name":"Time Technoplast Ltd","Market Capitalization":9934.91,"Close Price":201.26,"Industry":"Cylinder","Price To Earnings":20.01,"Price To Sales":1.63,"Revenue":6105.2,"Revenue Growth TTM":11.88,"PAT Growth TTM":20.83,"Price To Earnings Median 5 Years":15.44,"PEG":0.57,"Price To Earnings Median 3 Years":20.42,"Industry PE Median":14.16,"Industry PS Median":1.23,"EV To EBITDA":11.24,"CFO To PAT":48.94,"Debt To Equity":0.16,"Days Receivable":86.84,"Days Receivable 3 Years Back":80.24,"EMA 40W":187.76,"Returns Vs Industry 1Y":2.11,"Returns Vs Industry 3Y":23.16,"CWIP":229.77,"Debt":639.44,"Debt 3 Years Back":900.28,"Operating Cash Flow":233.24,"Operating Cash Flow 1 Year Back":430.52,"EPS":10.06,"PAT Growth QoQ":4.51,"PAT Growth YoY":20.12,"PAT Growth 3 Years":28.66,"EPS Growth QoQ":-2.91,"EPS Growth YoY":10.33,"EPS Growth 3 Years":27.32,"EPS Growth 5 Years":34.26,"Promoter Holdings":47.56,"DII Holdings":17.57,"FII Holdings":8.53,"Change In DII Holdings 1 Year":4.65,"Change In DII Holdings 3 Years":12.84,"Change In FII Holdings 1 Year":0.24,"Change In FII Holdings 3 Years":1.65,"Change In Promoter Holdings 1 Year":-4.06,"Change In Promoter Holdings 3 Years":-4.12,"Equity Shares":493635379.0,"Fixed Assets":1435.27,"Fixed Assets 3 Years Back":1382.79,"EMA 20D":192.36,"EMA 50D":185.12,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":476.61,"PAT 1 Year Back":394.45,"PAT 3 Years Back":223.77,"PAT Latest Quarter":134.31,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"TIMETECHNO","exchange":"NSE","isETF":false},{"companyId":"NSE:THYROCARE","Name":"Thyrocare Technologies Ltd","Market Capitalization":8980.9,"Close Price":564.25,"Industry":"Diagnostics","Price To Earnings":51.02,"Price To Sales":10.25,"Revenue":876.03,"Revenue Growth TTM":21.09,"PAT Growth TTM":67.15,"Price To Earnings Median 5 Years":44.21,"PEG":0.0,"Price To Earnings Median 3 Years":50.34,"Industry PE Median":40.93,"Industry PS Median":7.18,"EV To EBITDA":30.76,"CFO To PAT":130.94,"Debt To Equity":0.1,"Days Receivable":32.53,"Days Receivable 3 Years Back":58.99,"EMA 40W":451.51,"Returns Vs Industry 1Y":9.88,"Returns Vs Industry 3Y":-3.46,"CWIP":3.07,"Debt":50.69,"Debt 3 Years Back":23.31,"Operating Cash Flow":213.23,"Operating Cash Flow 1 Year Back":191.32,"EPS":11.06,"PAT Growth QoQ":5.4,"PAT Growth YoY":34.06,"PAT Growth 3 Years":36.28,"EPS Growth QoQ":8.03,"EPS Growth YoY":31.84,"EPS Growth 3 Years":36.37,"EPS Growth 5 Years":7.54,"Promoter Holdings":60.92,"DII Holdings":20.92,"FII Holdings":5.44,"Change In DII Holdings 1 Year":6.38,"Change In DII Holdings 3 Years":7.46,"Change In FII Holdings 1 Year":2.21,"Change In FII Holdings 3 Years":2.0,"Change In Promoter Holdings 1 Year":-10.13,"Change In Promoter Holdings 3 Years":-10.22,"Equity Shares":159165315.0,"Fixed Assets":317.32,"Fixed Assets 3 Years Back":293.89,"EMA 20D":540.56,"EMA 50D":517.6,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":175.89,"PAT 1 Year Back":162.85,"PAT 3 Years Back":69.49,"PAT Latest Quarter":51.33,"Pledged Percentage 1 Year Back":33.3,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"THYROCARE","exchange":"NSE","isETF":false},{"companyId":"BSE:TDPOWERSYS","Name":"TD Power Systems Ltd","Market Capitalization":17396.04,"Close Price":1113.5,"Industry":"Capital Goods - Gensets/Turbines","Price To Earnings":72.83,"Price To Sales":9.37,"Revenue":1856.23,"Revenue Growth TTM":45.16,"PAT Growth TTM":36.78,"Price To Earnings Median 5 Years":37.69,"PEG":1.84,"Price To Earnings Median 3 Years":45.44,"Industry PE Median":64.23,"Industry PS Median":9.15,"EV To EBITDA":53.44,"CFO To PAT":54.05,"Debt To Equity":0.02,"Days Receivable":145.92,"Days Receivable 3 Years Back":112.59,"EMA 40W":962.59,"Returns Vs Industry 1Y":66.79,"Returns Vs Industry 3Y":24.51,"CWIP":17.32,"Debt":18.11,"Debt 3 Years Back":0.0,"Operating Cash Flow":129.07,"Operating Cash Flow 1 Year Back":39.52,"EPS":15.29,"PAT Growth QoQ":28.18,"PAT Growth YoY":36.16,"PAT Growth 3 Years":35.11,"EPS Growth QoQ":27.98,"EPS Growth YoY":35.88,"EPS Growth 3 Years":34.89,"EPS Growth 5 Years":38.78,"Promoter Holdings":26.87,"DII Holdings":23.88,"FII Holdings":26.18,"Change In DII Holdings 1 Year":-1.41,"Change In DII Holdings 3 Years":8.13,"Change In FII Holdings 1 Year":2.48,"Change In FII Holdings 3 Years":23.57,"Change In Promoter Holdings 1 Year":-0.01,"Change In Promoter Holdings 3 Years":-31.55,"Equity Shares":156228430.0,"Fixed Assets":293.71,"Fixed Assets 3 Years Back":163.3,"EMA 20D":1154.69,"EMA 50D":1160.0,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":238.77,"PAT 1 Year Back":174.58,"PAT 3 Years Back":96.81,"PAT Latest Quarter":72.19,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"TDPOWERSYS","exchange":"BSE","isETF":false},{"companyId":"NSE:SBCL","Name":"Shivalik Bimetal Controls Ltd","Market Capitalization":4353.15,"Close Price":755.7,"Industry":"Shunt Resistors","Price To Earnings":45.39,"Price To Sales":7.63,"Revenue":570.86,"Revenue Growth TTM":12.3,"PAT Growth TTM":24.41,"Price To Earnings Median 5 Years":36.21,"PEG":1.5,"Price To Earnings Median 3 Years":38.37,"Industry PE Median":45.39,"Industry PS Median":7.63,"EV To EBITDA":32.85,"CFO To PAT":57.26,"Debt To Equity":0.12,"Days Receivable":99.46,"Days Receivable 3 Years Back":72.34,"EMA 40W":589.33,"Returns Vs Industry 1Y":0.0,"Returns Vs Industry 3Y":0.0,"CWIP":33.83,"Debt":59.38,"Debt 3 Years Back":58.67,"Operating Cash Flow":54.89,"Operating Cash Flow 1 Year Back":93.59,"EPS":16.65,"PAT Growth QoQ":17.45,"PAT Growth YoY":23.75,"PAT Growth 3 Years":6.61,"EPS Growth QoQ":17.01,"EPS Growth YoY":24.04,"EPS Growth 3 Years":6.8,"EPS Growth 5 Years":30.42,"Promoter Holdings":33.61,"DII Holdings":14.55,"FII Holdings":2.04,"Change In DII Holdings 1 Year":-6.45,"Change In DII Holdings 3 Years":14.39,"Change In FII Holdings 1 Year":-1.1,"Change In FII Holdings 3 Years":1.58,"Change In Promoter Holdings 1 Year":0.44,"Change In Promoter Holdings 3 Years":-26.99,"Equity Shares":57604200.0,"Fixed Assets":150.58,"Fixed Assets 3 Years Back":118.91,"EMA 20D":739.99,"EMA 50D":705.16,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":95.86,"PAT 1 Year Back":77.06,"PAT 3 Years Back":79.1,"PAT Latest Quarter":26.05,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.25,"symbol":"SBCL","exchange":"NSE","isETF":false},{"companyId":"BSE:SHILPAMED","Name":"Shilpa Medicare Ltd","Market Capitalization":11871.82,"Close Price":607.0,"Industry":"Pharma - API & CRAMS","Price To Earnings":46.91,"Price To Sales":7.71,"Revenue":1538.87,"Revenue Growth TTM":19.62,"PAT Growth TTM":210.81,"Price To Earnings Median 5 Years":85.85,"PEG":4.37,"Price To Earnings Median 3 Years":83.61,"Industry PE Median":43.25,"Industry PS Median":6.57,"EV To EBITDA":28.57,"CFO To PAT":140.62,"Debt To Equity":0.25,"Days Receivable":123.06,"Days Receivable 3 Years Back":112.74,"EMA 40W":449.4,"Returns Vs Industry 1Y":21.36,"Returns Vs Industry 3Y":25.17,"CWIP":431.2,"Debt":657.97,"Debt 3 Years Back":797.89,"Operating Cash Flow":342.18,"Operating Cash Flow 1 Year Back":132.18,"EPS":12.94,"PAT Growth QoQ":141.79,"PAT Growth YoY":642.87,"PAT Growth 3 Years":114.41,"EPS Growth QoQ":141.67,"EPS Growth YoY":1389.19,"EPS Growth 3 Years":105.3,"EPS Growth 5 Years":6.55,"Promoter Holdings":40.13,"DII Holdings":8.05,"FII Holdings":11.38,"Change In DII Holdings 1 Year":0.59,"Change In DII Holdings 3 Years":8.05,"Change In FII Holdings 1 Year":0.19,"Change In FII Holdings 3 Years":1.13,"Change In Promoter Holdings 1 Year":-4.09,"Change In Promoter Holdings 3 Years":-9.88,"Equity Shares":195581816.0,"Fixed Assets":2045.97,"Fixed Assets 3 Years Back":1665.63,"EMA 20D":606.74,"EMA 50D":559.02,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":243.33,"PAT 1 Year Back":78.3,"PAT 3 Years Back":-30.97,"PAT Latest Quarter":107.79,"Pledged Percentage 1 Year Back":3.96,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"SHILPAMED","exchange":"BSE","isETF":false},{"companyId":"NSE:SAREGAMA","Name":"Saregama India Ltd","Market Capitalization":9572.99,"Close Price":496.5,"Industry":"Music Licensing","Price To Earnings":46.36,"Price To Sales":9.72,"Revenue":984.62,"Revenue Growth TTM":-15.94,"PAT Growth TTM":0.97,"Price To Earnings Median 5 Years":47.79,"PEG":3.65,"Price To Earnings Median 3 Years":43.78,"Industry PE Median":44.01,"Industry PS Median":16.21,"EV To EBITDA":27.76,"CFO To PAT":48.5,"Debt To Equity":0.04,"Days Receivable":65.58,"Days Receivable 3 Years Back":73.32,"EMA 40W":418.66,"Returns Vs Industry 1Y":-5.64,"Returns Vs Industry 3Y":-14.09,"CWIP":0.0,"Debt":70.38,"Debt 3 Years Back":0.71,"Operating Cash Flow":100.02,"Operating Cash Flow 1 Year Back":331.2,"EPS":10.71,"PAT Growth QoQ":44.66,"PAT Growth YoY":23.86,"PAT Growth 3 Years":3.68,"EPS Growth QoQ":44.57,"EPS Growth YoY":24.12,"EPS Growth 3 Years":5.96,"EPS Growth 5 Years":11.81,"Promoter Holdings":60.84,"DII Holdings":8.6,"FII Holdings":11.5,"Change In DII Holdings 1 Year":3.38,"Change In DII Holdings 3 Years":6.32,"Change In FII Holdings 1 Year":-5.18,"Change In FII Holdings 3 Years":-6.29,"Change In Promoter Holdings 1 Year":1.19,"Change In Promoter Holdings 3 Years":2.01,"Equity Shares":192809490.0,"Fixed Assets":1031.2,"Fixed Assets 3 Years Back":341.78,"EMA 20D":486.51,"EMA 50D":456.98,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":206.22,"PAT 1 Year Back":204.24,"PAT 3 Years Back":185.05,"PAT Latest Quarter":74.14,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"SAREGAMA","exchange":"NSE","isETF":false},{"companyId":"NSE:SANSERA","Name":"Sansera Engineering Ltd","Market Capitalization":19873.66,"Close Price":3184.7,"Industry":"Auto Ancillaries - Diversified","Price To Earnings":61.04,"Price To Sales":5.68,"Revenue":3497.92,"Revenue Growth TTM":15.95,"PAT Growth TTM":50.71,"Price To Earnings Median 5 Years":30.9,"PEG":2.5,"Price To Earnings Median 3 Years":35.54,"Industry PE Median":39.35,"Industry PS Median":2.19,"EV To EBITDA":31.79,"CFO To PAT":118.42,"Debt To Equity":0.15,"Days Receivable":65.43,"Days Receivable 3 Years Back":67.55,"EMA 40W":2383.77,"Returns Vs Industry 1Y":102.81,"Returns Vs Industry 3Y":26.49,"CWIP":219.55,"Debt":457.58,"Debt 3 Years Back":804.22,"Operating Cash Flow":387.07,"Operating Cash Flow 1 Year Back":376.56,"EPS":52.17,"PAT Growth QoQ":77.27,"PAT Growth YoY":107.84,"PAT Growth 3 Years":30.13,"EPS Growth QoQ":76.56,"EPS Growth YoY":103.87,"EPS Growth 3 Years":23.37,"EPS Growth 5 Years":19.9,"Promoter Holdings":29.21,"DII Holdings":31.04,"FII Holdings":21.52,"Change In DII Holdings 1 Year":-5.85,"Change In DII Holdings 3 Years":6.73,"Change In FII Holdings 1 Year":1.99,"Change In FII Holdings 3 Years":5.15,"Change In Promoter Holdings 1 Year":-1.14,"Change In Promoter Holdings 3 Years":-6.02,"Equity Shares":62403568.0,"Fixed Assets":2261.72,"Fixed Assets 3 Years Back":1393.62,"EMA 20D":3189.31,"EMA 50D":2996.98,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":326.86,"PAT 1 Year Back":216.09,"PAT 3 Years Back":148.34,"PAT Latest Quarter":123.06,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.89,"symbol":"SANSERA","exchange":"NSE","isETF":false},{"companyId":"NSE:MOTHERSON","Name":"Samvardhana Motherson International Ltd","Market Capitalization":153619.91,"Close Price":145.55,"Industry":"Auto Ancillaries - Diversified","Price To Earnings":39.77,"Price To Sales":1.22,"Revenue":126103.7,"Revenue Growth TTM":10.95,"PAT Growth TTM":-1.45,"Price To Earnings Median 5 Years":36.56,"PEG":1.48,"Price To Earnings Median 3 Years":34.85,"Industry PE Median":39.35,"Industry PS Median":2.19,"EV To EBITDA":13.83,"CFO To PAT":276.19,"Debt To Equity":0.46,"Days Receivable":57.54,"Days Receivable 3 Years Back":39.48,"EMA 40W":126.83,"Returns Vs Industry 1Y":12.23,"Returns Vs Industry 3Y":6.2,"CWIP":4094.2,"Debt":19169.7,"Debt 3 Years Back":13792.3,"Operating Cash Flow":11284.0,"Operating Cash Flow 1 Year Back":6286.2,"EPS":3.66,"PAT Growth QoQ":45.63,"PAT Growth YoY":40.0,"PAT Growth 3 Years":34.76,"EPS Growth QoQ":46.39,"EPS Growth YoY":43.43,"EPS Growth 3 Years":35.54,"EPS Growth 5 Years":24.78,"Promoter Holdings":48.6,"DII Holdings":20.65,"FII Holdings":12.87,"Change In DII Holdings 1 Year":-0.09,"Change In DII Holdings 3 Years":5.73,"Change In FII Holdings 1 Year":0.25,"Change In FII Holdings 3 Years":2.03,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":-16.17,"Equity Shares":10554442601.0,"Fixed Assets":38576.04,"Fixed Assets 3 Years Back":23202.57,"EMA 20D":144.22,"EMA 50D":140.86,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":4085.6,"PAT 1 Year Back":4145.7,"PAT 3 Years Back":1669.6,"PAT Latest Quarter":1561.56,"Pledged Percentage 1 Year Back":1.93,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"MOTHERSON","exchange":"NSE","isETF":false},{"companyId":"NSE:SAMHI","Name":"Samhi Hotels Ltd","Market Capitalization":3946.45,"Close Price":177.66,"Industry":"Hotels","Price To Earnings":6.9,"Price To Sales":3.16,"Revenue":1247.8,"Revenue Growth TTM":11.12,"PAT Growth TTM":562.55,"Price To Earnings Median 5 Years":38.11,"PEG":0.26,"Price To Earnings Median 3 Years":38.11,"Industry PE Median":33.89,"Industry PS Median":6.0,"EV To EBITDA":12.6,"CFO To PAT":71.83,"Debt To Equity":0.78,"Days Receivable":19.84,"Days Receivable 3 Years Back":25.34,"EMA 40W":171.08,"Returns Vs Industry 1Y":-9.22,"CWIP":139.38,"Debt":1708.2,"Debt 3 Years Back":2744.03,"Operating Cash Flow":406.98,"Operating Cash Flow 1 Year Back":357.04,"EPS":25.73,"PAT Growth QoQ":729.66,"PAT Growth YoY":770.72,"PAT Growth 3 Years":54.29,"EPS Growth QoQ":727.52,"EPS Growth YoY":767.31,"EPS Growth 3 Years":37.2,"EPS Growth 5 Years":19.22,"Promoter Holdings":0.0,"DII Holdings":17.35,"FII Holdings":44.62,"Change In DII Holdings 1 Year":2.3,"Change In DII Holdings 3 Years":5.66,"Change In FII Holdings 1 Year":-2.85,"Change In FII Holdings 3 Years":-18.67,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.0,"Equity Shares":222134736.0,"Fixed Assets":3474.42,"Fixed Assets 3 Years Back":1915.63,"EMA 20D":170.69,"EMA 50D":168.09,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":566.55,"PAT 1 Year Back":85.5,"PAT 3 Years Back":-338.59,"PAT Latest Quarter":399.4,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"SAMHI","exchange":"NSE","isETF":false},{"companyId":"BSE:SAILIFE","Name":"Sai Life Sciences Ltd","Market Capitalization":26161.1,"Close Price":1232.3,"Industry":"Pharma - API & CRAMS","Price To Earnings":74.19,"Price To Sales":11.93,"Revenue":2192.49,"Revenue Growth TTM":29.38,"PAT Growth TTM":105.08,"Price To Earnings Median 5 Years":63.64,"PEG":1.78,"Price To Earnings Median 3 Years":63.64,"Industry PE Median":43.25,"Industry PS Median":6.57,"EV To EBITDA":42.0,"CFO To PAT":145.92,"Debt To Equity":0.04,"Days Receivable":62.2,"Days Receivable 3 Years Back":85.18,"EMA 40W":1040.11,"Returns Vs Industry 1Y":36.57,"CWIP":270.45,"Debt":95.12,"Debt 3 Years Back":932.38,"Operating Cash Flow":509.13,"Operating Cash Flow 1 Year Back":314.05,"EPS":16.61,"PAT Growth QoQ":3.85,"PAT Growth YoY":18.09,"PAT Growth 3 Years":226.89,"EPS Growth QoQ":3.35,"EPS Growth YoY":16.27,"EPS Growth 3 Years":211.54,"EPS Growth 5 Years":-8.82,"Promoter Holdings":34.53,"DII Holdings":32.71,"FII Holdings":19.65,"Change In DII Holdings 1 Year":11.07,"Change In FII Holdings 1 Year":5.07,"Change In Promoter Holdings 1 Year":-0.62,"Equity Shares":212294916.0,"Fixed Assets":1814.84,"EMA 20D":1247.95,"EMA 50D":1199.27,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":348.91,"PAT 1 Year Back":170.13,"PAT 3 Years Back":9.99,"PAT Latest Quarter":104.24,"Pledged Percentage 1 Year Back":0.01,"Change In Promoter Holdings Latest Quarter":-0.08,"symbol":"SAILIFE","exchange":"BSE","isETF":false},{"companyId":"NSE:RRKABEL","Name":"R R Kabel Ltd","Market Capitalization":28203.99,"Close Price":2493.6,"Industry":"Cables - Power","Price To Earnings":57.28,"Price To Sales":2.9,"Revenue":9722.36,"Revenue Growth TTM":27.62,"PAT Growth TTM":57.96,"Price To Earnings Median 5 Years":49.55,"PEG":1.95,"Price To Earnings Median 3 Years":49.55,"Industry PE Median":46.61,"Industry PS Median":2.29,"EV To EBITDA":34.63,"CFO To PAT":59.99,"Debt To Equity":0.13,"Days Receivable":37.47,"Days Receivable 3 Years Back":38.58,"EMA 40W":1770.93,"Returns Vs Industry 1Y":37.79,"CWIP":72.19,"Debt":337.03,"Debt 3 Years Back":580.44,"Operating Cash Flow":295.29,"Operating Cash Flow 1 Year Back":494.4,"EPS":43.53,"PAT Growth QoQ":42.03,"PAT Growth YoY":30.06,"PAT Growth 3 Years":37.37,"EPS Growth QoQ":41.97,"EPS Growth YoY":29.92,"EPS Growth 3 Years":36.57,"EPS Growth 5 Years":28.99,"Promoter Holdings":61.38,"DII Holdings":11.87,"FII Holdings":10.67,"Change In DII Holdings 1 Year":-1.76,"Change In FII Holdings 1 Year":2.11,"Change In Promoter Holdings 1 Year":-0.38,"Equity Shares":113105505.0,"Fixed Assets":1172.7,"Fixed Assets 3 Years Back":536.79,"EMA 20D":2337.08,"EMA 50D":2188.19,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":492.22,"PAT 1 Year Back":311.61,"PAT 3 Years Back":189.87,"PAT Latest Quarter":167.95,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.27,"symbol":"RRKABEL","exchange":"NSE","isETF":false},{"companyId":"NSE:RATEGAIN","Name":"Rategain Travel Technologies Ltd","Market Capitalization":10663.04,"Close Price":900.4,"Industry":"IT Product Companies","Price To Earnings":54.67,"Price To Sales":5.85,"Revenue":1823.55,"Revenue Growth TTM":69.37,"PAT Growth TTM":-6.96,"Price To Earnings Median 5 Years":55.31,"PEG":1.0,"Price To Earnings Median 3 Years":44.86,"Industry PE Median":27.16,"Industry PS Median":3.75,"EV To EBITDA":33.08,"CFO To PAT":120.23,"Debt To Equity":0.46,"Days Receivable":94.36,"Days Receivable 3 Years Back":103.85,"EMA 40W":690.64,"Returns Vs Industry 1Y":99.61,"Returns Vs Industry 3Y":5.04,"CWIP":0.0,"Debt":921.24,"Debt 3 Years Back":17.69,"Operating Cash Flow":233.71,"Operating Cash Flow 1 Year Back":119.97,"EPS":16.47,"PAT Growth QoQ":164.61,"PAT Growth YoY":27.7,"PAT Growth 3 Years":41.65,"EPS Growth QoQ":164.73,"EPS Growth YoY":27.53,"EPS Growth 3 Years":37.54,"EPS Growth 5 Years":48.94,"Promoter Holdings":48.78,"DII Holdings":20.86,"FII Holdings":5.76,"Change In DII Holdings 1 Year":-2.69,"Change In DII Holdings 3 Years":3.08,"Change In FII Holdings 1 Year":0.26,"Change In FII Holdings 3 Years":0.43,"Change In Promoter Holdings 1 Year":0.62,"Change In Promoter Holdings 3 Years":-6.99,"Equity Shares":118425559.0,"Fixed Assets":2402.63,"Fixed Assets 3 Years Back":397.23,"EMA 20D":911.47,"EMA 50D":837.57,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":194.39,"PAT 1 Year Back":208.93,"PAT 3 Years Back":68.4,"PAT Latest Quarter":69.99,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"RATEGAIN","exchange":"NSE","isETF":false},{"companyId":"NSE:PRIVISCL","Name":"Privi Speciality Chemicals Ltd","Market Capitalization":14043.82,"Close Price":3595.2,"Industry":"Speciality Chemicals","Price To Earnings":42.88,"Price To Sales":5.48,"Revenue":2563.69,"Revenue Growth TTM":22.01,"PAT Growth TTM":71.44,"Price To Earnings Median 5 Years":51.85,"PEG":1.94,"Price To Earnings Median 3 Years":47.14,"Industry PE Median":34.28,"Industry PS Median":4.56,"EV To EBITDA":23.15,"CFO To PAT":173.68,"Debt To Equity":0.72,"Days Receivable":74.89,"Days Receivable 3 Years Back":67.1,"EMA 40W":3102.99,"Returns Vs Industry 1Y":34.27,"Returns Vs Industry 3Y":43.49,"CWIP":313.77,"Debt":1021.27,"Debt 3 Years Back":1079.33,"Operating Cash Flow":550.09,"Operating Cash Flow 1 Year Back":281.11,"EPS":83.85,"PAT Growth QoQ":25.73,"PAT Growth YoY":47.09,"PAT Growth 3 Years":145.99,"EPS Growth QoQ":20.13,"EPS Growth YoY":40.87,"EPS Growth 3 Years":148.72,"EPS Growth 5 Years":22.88,"Promoter Holdings":60.6,"DII Holdings":10.08,"FII Holdings":1.94,"Change In DII Holdings 1 Year":6.18,"Change In DII Holdings 3 Years":6.81,"Change In FII Holdings 1 Year":0.47,"Change In FII Holdings 3 Years":0.96,"Change In Promoter Holdings 1 Year":-9.29,"Change In Promoter Holdings 3 Years":-13.45,"Equity Shares":39062706.0,"Fixed Assets":1184.62,"Fixed Assets 3 Years Back":1022.24,"EMA 20D":3620.64,"EMA 50D":3490.74,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":316.72,"PAT 1 Year Back":184.75,"PAT 3 Years Back":21.28,"PAT Latest Quarter":94.11,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"PRIVISCL","exchange":"NSE","isETF":false},{"companyId":"NSE:PRICOLLTD","Name":"Pricol Ltd","Market Capitalization":7662.69,"Close Price":628.7,"Industry":"Auto Ancillaries - 2 Wheelers","Price To Earnings":30.58,"Price To Sales":1.9,"Revenue":4040.8,"Revenue Growth TTM":50.11,"PAT Growth TTM":50.15,"Price To Earnings Median 5 Years":31.99,"PEG":0.41,"Price To Earnings Median 3 Years":34.04,"Industry PE Median":32.18,"Industry PS Median":2.11,"EV To EBITDA":16.81,"CFO To PAT":112.15,"Debt To Equity":0.3,"Days Receivable":52.19,"Days Receivable 3 Years Back":50.13,"EMA 40W":573.06,"Returns Vs Industry 1Y":7.99,"Returns Vs Industry 3Y":10.48,"CWIP":111.56,"Debt":379.16,"Debt 3 Years Back":110.33,"Operating Cash Flow":281.26,"Operating Cash Flow 1 Year Back":223.43,"EPS":20.56,"PAT Growth QoQ":14.98,"PAT Growth YoY":109.53,"PAT Growth 3 Years":26.23,"EPS Growth QoQ":14.94,"EPS Growth YoY":109.06,"EPS Growth 3 Years":26.22,"EPS Growth 5 Years":40.11,"Promoter Holdings":38.51,"DII Holdings":11.79,"FII Holdings":13.95,"Change In DII Holdings 1 Year":-3.7,"Change In DII Holdings 3 Years":6.22,"Change In FII Holdings 1 Year":-2.11,"Change In FII Holdings 3 Years":11.06,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.0,"Equity Shares":121881498.0,"Fixed Assets":1044.83,"Fixed Assets 3 Years Back":597.73,"EMA 20D":611.38,"EMA 50D":596.18,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":250.8,"PAT 1 Year Back":167.03,"PAT 3 Years Back":124.69,"PAT Latest Quarter":73.23,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"PRICOLLTD","exchange":"NSE","isETF":false},{"companyId":"BSE:PAYTM","Name":"One 97 Communications Ltd","Market Capitalization":82263.89,"Close Price":1284.0,"Industry":"E-Commerce - Platform - Utility","Price To Earnings":126.38,"Price To Sales":9.17,"Revenue":8967.0,"Revenue Growth TTM":22.55,"PAT Growth TTM":116.33,"Price To Earnings Median 5 Years":193.93,"PEG":7.09,"Price To Earnings Median 3 Years":193.93,"Industry PE Median":36.14,"Industry PS Median":6.04,"EV To EBITDA":107.1,"CFO To PAT":-134.6,"Debt To Equity":0.0,"Days Receivable":51.31,"Days Receivable 3 Years Back":56.54,"EMA 40W":1150.61,"Returns Vs Industry 1Y":9.94,"Returns Vs Industry 3Y":0.02,"CWIP":7.0,"Debt":0.0,"Debt 3 Years Back":223.3,"Operating Cash Flow":-743.0,"Operating Cash Flow 1 Year Back":-121.3,"EPS":10.16,"PAT Growth QoQ":20.22,"PAT Growth YoY":78.86,"PAT Growth 3 Years":34.92,"EPS Growth QoQ":19.86,"EPS Growth YoY":79.17,"EPS Growth 3 Years":32.4,"EPS Growth 5 Years":18.22,"Promoter Holdings":0.0,"DII Holdings":24.87,"FII Holdings":48.08,"Change In DII Holdings 1 Year":9.04,"Change In DII Holdings 3 Years":21.33,"Change In FII Holdings 1 Year":-6.79,"Change In FII Holdings 3 Years":-24.03,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.0,"Equity Shares":640684481.0,"Fixed Assets":910.0,"Fixed Assets 3 Years Back":1213.0,"EMA 20D":1268.46,"EMA 50D":1203.58,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":649.0,"PAT 1 Year Back":552.0,"PAT 3 Years Back":-1422.4,"PAT Latest Quarter":220.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"PAYTM","exchange":"BSE","isETF":false},{"companyId":"NSE:NUVAMA","Name":"Nuvama Wealth Management Ltd","Market Capitalization":36142.53,"Close Price":1980.1,"Industry":"Finance - Capital Markets - Wealth Management","Price To Earnings":34.38,"Price To Sales":7.8,"Revenue":4630.69,"Revenue Growth TTM":11.4,"PAT Growth TTM":5.6,"Price To Earnings Median 5 Years":23.4,"PEG":1.1,"Price To Earnings Median 3 Years":23.4,"Industry PE Median":34.9,"Industry PS Median":8.76,"EV To EBITDA":10.29,"CFO To PAT":-289.69,"Debt To Equity":2.8,"Days Receivable 3 Years Back":146.68,"EMA 40W":1508.97,"Returns Vs Industry 1Y":8.07,"Debt":11543.52,"Debt 3 Years Back":5413.15,"Operating Cash Flow":-3013.53,"Operating Cash Flow 1 Year Back":-371.11,"EPS":57.59,"PAT Growth QoQ":5.98,"PAT Growth YoY":5.3,"PAT Growth 3 Years":50.52,"EPS Growth QoQ":5.49,"EPS Growth YoY":3.94,"EPS Growth 3 Years":-11.19,"EPS Growth 5 Years":18.55,"Promoter Holdings":53.98,"DII Holdings":8.49,"FII Holdings":19.0,"Change In DII Holdings 1 Year":2.13,"Change In DII Holdings 3 Years":7.71,"Change In FII Holdings 1 Year":1.86,"Change In FII Holdings 3 Years":9.6,"Change In Promoter Holdings 1 Year":-0.75,"Change In Promoter Holdings 3 Years":-2.2,"Equity Shares":182528816.0,"Fixed Assets":288.85,"Fixed Assets 3 Years Back":299.1,"EMA 20D":1865.1,"EMA 50D":1729.57,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":1040.26,"PAT 1 Year Back":985.06,"PAT 3 Years Back":305.07,"PAT Latest Quarter":268.79,"Pledged Percentage 1 Year Back":12.39,"Change In Promoter Holdings Latest Quarter":-0.14,"symbol":"NUVAMA","exchange":"NSE","isETF":false},{"companyId":"NSE:NH","Name":"Narayana Hrudayalaya Ltd","Market Capitalization":40085.37,"Close Price":1961.5,"Industry":"Hospitals","Price To Earnings":49.46,"Price To Sales":5.08,"Revenue":7896.04,"Revenue Growth TTM":44.01,"PAT Growth TTM":1.94,"Price To Earnings Median 5 Years":36.22,"PEG":0.39,"Price To Earnings Median 3 Years":34.49,"Industry PE Median":50.5,"Industry PS Median":6.56,"EV To EBITDA":27.37,"CFO To PAT":201.15,"Debt To Equity":1.07,"Days Receivable":30.31,"Days Receivable 3 Years Back":34.81,"EMA 40W":1843.52,"Returns Vs Industry 1Y":-17.41,"Returns Vs Industry 3Y":-4.36,"CWIP":266.84,"Debt":4866.04,"Debt 3 Years Back":884.17,"Operating Cash Flow":1621.19,"Operating Cash Flow 1 Year Back":985.78,"EPS":39.66,"PAT Growth QoQ":76.66,"PAT Growth YoY":13.53,"PAT Growth 3 Years":9.94,"EPS Growth QoQ":76.6,"EPS Growth YoY":13.49,"EPS Growth 3 Years":9.94,"EPS Growth 5 Years":125.78,"Promoter Holdings":63.27,"DII Holdings":9.06,"FII Holdings":9.4,"Change In DII Holdings 1 Year":0.97,"Change In DII Holdings 3 Years":-2.89,"Change In FII Holdings 1 Year":-1.06,"Change In FII Holdings 3 Years":-1.71,"Change In Promoter Holdings 1 Year":-0.58,"Change In Promoter Holdings 3 Years":-0.58,"Equity Shares":204360804.0,"Fixed Assets":7820.93,"Fixed Assets 3 Years Back":2336.39,"EMA 20D":1985.23,"EMA 50D":1938.78,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":805.98,"PAT 1 Year Back":789.82,"PAT 3 Years Back":606.57,"PAT Latest Quarter":223.99,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"NH","exchange":"NSE","isETF":false},{"companyId":"BSE:MOTILALOFS","Name":"Motilal Oswal Financial Services Ltd","Market Capitalization":52419.88,"Close Price":870.55,"Industry":"Finance - Capital Markets - Wealth Management","Price To Earnings":26.44,"Price To Sales":5.21,"Revenue":10062.73,"Revenue Growth TTM":14.85,"PAT Growth TTM":-28.67,"Price To Earnings Median 5 Years":13.96,"PEG":0.0,"Price To Earnings Median 3 Years":19.34,"Industry PE Median":34.9,"Industry PS Median":8.76,"EV To EBITDA":15.63,"CFO To PAT":-325.43,"Debt To Equity":1.65,"Days Receivable":158.01,"Days Receivable 3 Years Back":89.92,"EMA 40W":851.9,"Returns Vs Industry 1Y":-23.17,"Returns Vs Industry 3Y":3.17,"CWIP":115.14,"Debt":21255.11,"Debt 3 Years Back":10277.62,"Operating Cash Flow":-6070.7,"Operating Cash Flow 1 Year Back":1214.73,"EPS":32.92,"PAT Growth QoQ":681.31,"PAT Growth YoY":10.2,"PAT Growth 3 Years":-5.94,"EPS Growth QoQ":673.17,"EPS Growth YoY":9.08,"EPS Growth 3 Years":25.56,"EPS Growth 5 Years":7.76,"Promoter Holdings":67.2,"DII Holdings":6.78,"FII Holdings":6.86,"Change In DII Holdings 1 Year":1.34,"Change In DII Holdings 3 Years":0.67,"Change In FII Holdings 1 Year":-0.43,"Change In FII Holdings 3 Years":0.45,"Change In Promoter Holdings 1 Year":-0.6,"Change In Promoter Holdings 3 Years":-2.46,"Equity Shares":602146704.0,"Fixed Assets":768.67,"Fixed Assets 3 Years Back":465.81,"EMA 20D":942.12,"EMA 50D":910.75,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":1983.33,"PAT 1 Year Back":1865.43,"PAT 3 Years Back":2445.62,"PAT Latest Quarter":1273.71,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.33,"symbol":"MOTILALOFS","exchange":"BSE","isETF":false},{"companyId":"BSE:KMEW","Name":"Knowledge Marine & Engineering Works Ltd","Market Capitalization":5986.29,"Close Price":2433.45,"Industry":"Shipping","Price To Earnings":72.88,"Price To Sales":23.36,"Revenue":256.28,"Revenue Growth TTM":27.69,"PAT Growth TTM":59.5,"Price To Earnings Median 5 Years":53.04,"PEG":1.15,"Price To Earnings Median 3 Years":53.04,"Industry PE Median":14.12,"Industry PS Median":3.73,"EV To EBITDA":61.04,"CFO To PAT":93.97,"Debt To Equity":0.39,"Days Receivable":109.31,"Days Receivable 3 Years Back":101.06,"EMA 40W":1775.96,"Returns Vs Industry 1Y":106.85,"Returns Vs Industry 3Y":27.07,"CWIP":99.16,"Debt":222.06,"Debt 3 Years Back":24.14,"Operating Cash Flow":74.34,"Operating Cash Flow 1 Year Back":57.84,"EPS":33.39,"PAT Growth QoQ":-28.46,"PAT Growth YoY":123.88,"PAT Growth 3 Years":18.79,"EPS Growth QoQ":-27.87,"EPS Growth YoY":91.07,"EPS Growth 3 Years":15.17,"EPS Growth 5 Years":50.41,"Promoter Holdings":51.56,"DII Holdings":1.54,"FII Holdings":12.11,"Change In DII Holdings 1 Year":1.39,"Change In DII Holdings 3 Years":1.54,"Change In FII Holdings 1 Year":11.62,"Change In FII Holdings 3 Years":11.49,"Change In Promoter Holdings 1 Year":-9.13,"Change In Promoter Holdings 3 Years":-15.53,"Equity Shares":24600000.0,"Fixed Assets":211.24,"Fixed Assets 3 Years Back":58.83,"EMA 20D":2337.91,"EMA 50D":2181.03,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":79.11,"PAT 1 Year Back":49.6,"PAT 3 Years Back":47.2,"PAT Latest Quarter":23.53,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-2.07,"symbol":"KMEW","exchange":"BSE","isETF":false},{"companyId":"NSE:KDDL","Name":"KDDL Ltd","Market Capitalization":3856.07,"Close Price":3135.2,"Industry":"Watches","Price To Earnings":43.77,"Price To Sales":1.79,"Revenue":2153.43,"Revenue Growth TTM":30.68,"PAT Growth TTM":-4.99,"Price To Earnings Median 5 Years":33.62,"PEG":0.54,"Price To Earnings Median 3 Years":35.01,"Industry PE Median":70.78,"Industry PS Median":4.25,"EV To EBITDA":11.6,"CFO To PAT":106.44,"Debt To Equity":0.14,"Days Receivable":19.83,"Days Receivable 3 Years Back":20.36,"EMA 40W":2670.58,"Returns Vs Industry 1Y":-44.16,"Returns Vs Industry 3Y":-7.2,"CWIP":21.93,"Debt":156.48,"Debt 3 Years Back":246.45,"Operating Cash Flow":143.89,"Operating Cash Flow 1 Year Back":-4.26,"EPS":71.63,"PAT Growth QoQ":-9.79,"PAT Growth YoY":9.44,"PAT Growth 3 Years":20.65,"EPS Growth QoQ":10.11,"EPS Growth YoY":25.72,"EPS Growth 3 Years":19.31,"EPS Growth 5 Years":71.99,"Promoter Holdings":50.14,"DII Holdings":2.17,"FII Holdings":7.99,"Change In DII Holdings 1 Year":0.12,"Change In DII Holdings 3 Years":-0.17,"Change In FII Holdings 1 Year":-0.41,"Change In FII Holdings 3 Years":-4.51,"Change In Promoter Holdings 1 Year":-0.29,"Change In Promoter Holdings 3 Years":-0.07,"Equity Shares":12299280.0,"Fixed Assets":729.63,"Fixed Assets 3 Years Back":305.16,"EMA 20D":3148.93,"EMA 50D":2979.12,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":135.18,"PAT 1 Year Back":142.28,"PAT 3 Years Back":76.98,"PAT Latest Quarter":34.54,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.29,"symbol":"KDDL","exchange":"NSE","isETF":false},{"companyId":"NSE:JMFINANCIL","Name":"JM Financial Ltd","Market Capitalization":11679.7,"Close Price":122.05,"Industry":"Finance - Investment Bankers","Price To Earnings":9.71,"Price To Sales":2.85,"Revenue":4091.1,"Revenue Growth TTM":-6.55,"PAT Growth TTM":52.45,"Price To Earnings Median 5 Years":11.98,"PEG":1.24,"Price To Earnings Median 3 Years":14.24,"Industry PE Median":15.34,"Industry PS Median":4.71,"EV To EBITDA":7.36,"CFO To PAT":49.34,"Debt To Equity":1.08,"Days Receivable":127.63,"Days Receivable 3 Years Back":135.86,"EMA 40W":132.82,"Returns Vs Industry 1Y":-10.21,"Returns Vs Industry 3Y":-52.73,"CWIP":159.6,"Debt":11521.86,"Debt 3 Years Back":15874.63,"Operating Cash Flow":580.73,"Operating Cash Flow 1 Year Back":5568.65,"EPS":12.57,"PAT Growth QoQ":-47.75,"PAT Growth YoY":-32.19,"PAT Growth 3 Years":18.42,"EPS Growth QoQ":-47.09,"EPS Growth YoY":-21.0,"EPS Growth 3 Years":26.16,"EPS Growth 5 Years":14.67,"Promoter Holdings":57.03,"DII Holdings":5.49,"FII Holdings":16.95,"Change In DII Holdings 1 Year":-1.03,"Change In DII Holdings 3 Years":-2.12,"Change In FII Holdings 1 Year":-0.74,"Change In FII Holdings 3 Years":-3.77,"Change In Promoter Holdings 1 Year":0.52,"Change In Promoter Holdings 3 Years":0.56,"Equity Shares":956959936.0,"Fixed Assets":572.73,"Fixed Assets 3 Years Back":452.41,"EMA 20D":124.88,"EMA 50D":126.51,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":1176.88,"PAT 1 Year Back":772.0,"PAT 3 Years Back":708.76,"PAT Latest Quarter":159.36,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.04,"symbol":"JMFINANCIL","exchange":"NSE","isETF":false},{"companyId":"BSE:JSLL","Name":"Jeena Sikho Lifecare Ltd","Market Capitalization":6901.18,"Close Price":555.2,"Industry":"Ayurvedic","Price To Earnings":31.12,"Price To Sales":8.61,"Revenue":801.36,"Price To Earnings Median 5 Years":48.62,"PEG":0.35,"Price To Earnings Median 3 Years":48.62,"Industry PE Median":31.1,"Industry PS Median":8.61,"EV To EBITDA":19.97,"CFO To PAT":114.46,"Debt To Equity":0.0,"Days Receivable":31.85,"Days Receivable 3 Years Back":22.52,"EMA 40W":655.75,"CWIP":2.06,"Debt":0.46,"Debt 3 Years Back":7.43,"Operating Cash Flow":253.75,"Operating Cash Flow 1 Year Back":84.5,"EPS":17.84,"PAT Growth QoQ":-32.31,"PAT Growth YoY":77.9,"PAT Growth 3 Years":87.71,"EPS Growth QoQ":-32.28,"EPS Growth YoY":785.37,"EPS Growth 3 Years":86.28,"Promoter Holdings":63.62,"DII Holdings":0.36,"FII Holdings":4.78,"Change In DII Holdings 1 Year":0.36,"Change In FII Holdings 1 Year":-1.13,"Change In Promoter Holdings 1 Year":0.09,"Equity Shares":124300730.0,"Fixed Assets":293.74,"EMA 20D":575.06,"EMA 50D":596.9,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":221.7,"PAT 1 Year Back":79.94,"PAT 3 Years Back":11.19,"PAT Latest Quarter":45.08,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"JSLL","exchange":"BSE","isETF":false},{"companyId":"BSE:JSFB","Name":"Jana Small Finance Bank Ltd","Market Capitalization":5685.32,"Close Price":537.8,"Industry":"Banks - Small Finance","Price To Earnings":14.91,"Price To Sales":1.01,"Revenue":5637.43,"Revenue Growth TTM":18.24,"PAT Growth TTM":-12.26,"Price To Earnings Median 5 Years":11.56,"PEG":0.11,"Price To Earnings Median 3 Years":11.56,"Industry PE Median":15.14,"Industry PS Median":1.22,"EV To EBITDA":-73.47,"CFO To PAT":181.86,"Debt To Equity":1.24,"Days Receivable 3 Years Back":0.0,"EMA 40W":445.98,"Returns Vs Industry 1Y":3.48,"Debt":5496.76,"Debt 3 Years Back":6277.46,"Operating Cash Flow":593.64,"Operating Cash Flow 1 Year Back":4073.25,"EPS":36.07,"PAT Growth QoQ":11.02,"PAT Growth YoY":52.29,"PAT Growth 3 Years":-12.74,"EPS Growth QoQ":10.99,"EPS Growth YoY":52.12,"EPS Growth 3 Years":-10.43,"EPS Growth 5 Years":13.29,"Promoter Holdings":16.94,"DII Holdings":16.35,"FII Holdings":4.01,"Change In DII Holdings 1 Year":0.32,"Change In FII Holdings 1 Year":3.73,"Change In Promoter Holdings 1 Year":-4.94,"Equity Shares":105714482.0,"Fixed Assets":198.69,"Fixed Assets 3 Years Back":127.75,"Bulk Block Deals":52.6,"EMA 20D":502.25,"EMA 50D":478.1,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":379.73,"PAT 1 Year Back":326.43,"PAT 3 Years Back":669.54,"PAT Latest Quarter":155.23,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-4.9,"symbol":"JSFB","exchange":"BSE","isETF":false},{"companyId":"NSE:INTERARCH","Name":"Interarch Building Solutions Ltd","Market Capitalization":3017.76,"Close Price":1799.3,"Industry":"Pre-Engineering Buildings","Price To Earnings":22.4,"Price To Sales":1.59,"Revenue":1898.0,"Revenue Growth TTM":30.55,"PAT Growth TTM":24.75,"Price To Earnings Median 5 Years":25.36,"PEG":0.27,"Price To Earnings Median 3 Years":25.36,"Industry PE Median":19.98,"Industry PS Median":1.47,"EV To EBITDA":16.86,"CFO To PAT":-13.99,"Debt To Equity":0.02,"Days Receivable":55.42,"Days Receivable 3 Years Back":51.54,"EMA 40W":1926.82,"Returns Vs Industry 1Y":8.02,"CWIP":56.49,"Debt":15.0,"Debt 3 Years Back":17.73,"Operating Cash Flow":-18.82,"Operating Cash Flow 1 Year Back":53.56,"EPS":80.34,"PAT Growth QoQ":-1.77,"PAT Growth YoY":-5.38,"PAT Growth 3 Years":18.2,"EPS Growth QoQ":-1.8,"EPS Growth YoY":-6.15,"EPS Growth 3 Years":13.98,"EPS Growth 5 Years":79.71,"Promoter Holdings":59.43,"DII Holdings":6.1,"FII Holdings":4.86,"Change In DII Holdings 1 Year":-0.88,"Change In FII Holdings 1 Year":-0.81,"Change In Promoter Holdings 1 Year":-0.47,"Equity Shares":16771853.0,"EMA 20D":1836.2,"EMA 50D":1851.49,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":134.52,"PAT 1 Year Back":107.83,"PAT 3 Years Back":81.46,"PAT Latest Quarter":36.6,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"INTERARCH","exchange":"NSE","isETF":false},{"companyId":"NSE:INNOVACAP","Name":"Innova Captab Ltd","Market Capitalization":5438.94,"Close Price":950.45,"Industry":"Pharma - API","Price To Earnings":38.6,"Price To Sales":3.34,"Revenue":1630.02,"Revenue Growth TTM":31.07,"PAT Growth TTM":9.88,"Price To Earnings Median 5 Years":35.1,"PEG":1.19,"Price To Earnings Median 3 Years":35.1,"Industry PE Median":40.93,"Industry PS Median":3.35,"EV To EBITDA":24.2,"CFO To PAT":82.68,"Debt To Equity":0.32,"Days Receivable":97.92,"Days Receivable 3 Years Back":104.5,"EMA 40W":826.08,"Returns Vs Industry 1Y":-17.33,"CWIP":15.5,"Debt":343.69,"Debt 3 Years Back":236.97,"Operating Cash Flow":116.52,"Operating Cash Flow 1 Year Back":63.84,"EPS":24.62,"PAT Growth QoQ":-9.66,"PAT Growth YoY":28.78,"PAT Growth 3 Years":27.52,"EPS Growth QoQ":-9.77,"EPS Growth YoY":28.63,"EPS Growth 3 Years":20.26,"EPS Growth 5 Years":27.92,"Promoter Holdings":50.9,"DII Holdings":19.92,"FII Holdings":0.34,"Change In DII Holdings 1 Year":0.25,"Change In FII Holdings 1 Year":0.11,"Change In Promoter Holdings 1 Year":0.0,"Equity Shares":57224929.0,"Fixed Assets":841.51,"Fixed Assets 3 Years Back":182.88,"EMA 20D":968.63,"EMA 50D":925.13,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":140.92,"PAT 1 Year Back":128.26,"PAT 3 Years Back":67.95,"PAT Latest Quarter":38.08,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"INNOVACAP","exchange":"NSE","isETF":false},{"companyId":"NSE:IDEAFORGE","Name":"Ideaforge Technology Ltd","Market Capitalization":4325.88,"Close Price":870.65,"Industry":"Aerospace & Defence - Equipments","Price To Sales":19.13,"Revenue":226.13,"Revenue Growth TTM":40.27,"PAT Growth TTM":72.66,"Price To Earnings Median 5 Years":130.9,"Price To Earnings Median 3 Years":130.9,"Industry PE Median":95.04,"Industry PS Median":11.96,"EV To EBITDA":895.68,"CFO To PAT":372.39,"Debt To Equity":0.14,"Days Receivable":203.73,"Days Receivable 3 Years Back":113.45,"EMA 40W":643.1,"Returns Vs Industry 1Y":27.22,"Returns Vs Industry 3Y":-56.37,"CWIP":109.51,"Debt":83.71,"Debt 3 Years Back":100.56,"Operating Cash Flow":-63.41,"Operating Cash Flow 1 Year Back":-76.79,"EPS":-3.92,"PAT Growth QoQ":277.22,"PAT Growth YoY":333.33,"PAT Growth 3 Years":-36.3,"EPS Growth QoQ":277.03,"EPS Growth YoY":331.76,"EPS Growth 3 Years":-34.92,"EPS Growth 5 Years":4.14,"Promoter Holdings":28.96,"DII Holdings":2.69,"FII Holdings":4.89,"Change In DII Holdings 1 Year":1.18,"Change In FII Holdings 1 Year":4.29,"Change In Promoter Holdings 1 Year":-0.14,"Equity Shares":49685597.0,"Fixed Assets":247.48,"Fixed Assets 3 Years Back":70.21,"EMA 20D":862.24,"EMA 50D":820.3,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":-17.03,"PAT 1 Year Back":-62.28,"PAT 3 Years Back":31.99,"PAT Latest Quarter":59.99,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.08,"symbol":"IDEAFORGE","exchange":"NSE","isETF":false},{"companyId":"NSE:HINDZINC","Name":"Hindustan Zinc Ltd","Market Capitalization":224765.84,"Close Price":531.95,"Industry":"Metals","Price To Earnings":13.17,"Price To Sales":4.8,"Revenue":46820.0,"Revenue Growth TTM":38.83,"PAT Growth TTM":66.64,"Price To Earnings Median 5 Years":16.15,"PEG":1.09,"Price To Earnings Median 3 Years":18.97,"Industry PE Median":50.91,"Industry PS Median":4.8,"EV To EBITDA":8.87,"CFO To PAT":122.96,"Debt To Equity":0.39,"Days Receivable":3.57,"Days Receivable 3 Years Back":4.07,"EMA 40W":551.74,"Returns Vs Industry 1Y":-116.0,"Returns Vs Industry 3Y":-20.51,"CWIP":3409.0,"Debt":8728.0,"Debt 3 Years Back":11881.0,"Operating Cash Flow":17008.0,"Operating Cash Flow 1 Year Back":14160.0,"EPS":40.39,"PAT Growth QoQ":8.66,"PAT Growth YoY":144.81,"PAT Growth 3 Years":30.05,"EPS Growth QoQ":8.65,"EPS Growth YoY":144.61,"EPS Growth 3 Years":9.58,"EPS Growth 5 Years":11.63,"Promoter Holdings":60.71,"DII Holdings":4.95,"FII Holdings":2.2,"Change In DII Holdings 1 Year":0.13,"Change In DII Holdings 3 Years":2.0,"Change In FII Holdings 1 Year":0.84,"Change In FII Holdings 3 Years":1.39,"Change In Promoter Holdings 1 Year":-1.13,"Change In Promoter Holdings 3 Years":-4.21,"Equity Shares":4225319000.0,"Fixed Assets":19937.0,"Fixed Assets 3 Years Back":17622.0,"EMA 20D":535.24,"EMA 50D":554.98,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":17067.0,"PAT 1 Year Back":13832.0,"PAT 3 Years Back":7759.0,"PAT Latest Quarter":5469.0,"Pledged Percentage 1 Year Back":92.26,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"HINDZINC","exchange":"NSE","isETF":false},{"companyId":"NSE:HBLENGINE","Name":"HBL Engineering Ltd","Market Capitalization":19364.84,"Close Price":698.6,"Industry":"Railways - Kavach/Springs","Price To Earnings":23.77,"Price To Sales":5.86,"Revenue":3302.83,"Revenue Growth TTM":67.89,"PAT Growth TTM":203.96,"Price To Earnings Median 5 Years":35.89,"PEG":0.19,"Price To Earnings Median 3 Years":49.72,"Industry PE Median":26.06,"Industry PS Median":7.24,"EV To EBITDA":17.12,"CFO To PAT":92.52,"Debt To Equity":0.02,"Days Receivable":71.4,"Days Receivable 3 Years Back":83.21,"EMA 40W":765.22,"Returns Vs Industry 1Y":-4.27,"Returns Vs Industry 3Y":-20.03,"CWIP":127.48,"Debt":43.99,"Debt 3 Years Back":86.02,"Operating Cash Flow":738.44,"Operating Cash Flow 1 Year Back":239.14,"EPS":29.39,"PAT Growth QoQ":-76.08,"PAT Growth YoY":-0.55,"PAT Growth 3 Years":100.89,"EPS Growth QoQ":-70.82,"EPS Growth YoY":39.76,"EPS Growth 3 Years":103.06,"EPS Growth 5 Years":131.71,"Promoter Holdings":59.11,"DII Holdings":0.98,"FII Holdings":5.62,"Change In DII Holdings 1 Year":0.62,"Change In DII Holdings 3 Years":0.84,"Change In FII Holdings 1 Year":0.79,"Change In FII Holdings 3 Years":3.0,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.01,"Equity Shares":277194946.0,"Fixed Assets":440.51,"Fixed Assets 3 Years Back":345.29,"EMA 20D":750.96,"EMA 50D":768.45,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":798.1,"PAT 1 Year Back":276.48,"PAT 3 Years Back":98.45,"PAT Latest Quarter":52.03,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"HBLENGINE","exchange":"NSE","isETF":false},{"companyId":"NSE:GRAVITA","Name":"Gravita India Ltd","Market Capitalization":13106.17,"Close Price":1775.7,"Industry":"Recycling","Price To Earnings":34.13,"Price To Sales":3.07,"Revenue":4265.27,"Revenue Growth TTM":10.25,"PAT Growth TTM":20.91,"Price To Earnings Median 5 Years":27.14,"PEG":0.74,"Price To Earnings Median 3 Years":34.02,"Industry PE Median":31.31,"Industry PS Median":1.3,"EV To EBITDA":31.02,"CFO To PAT":44.75,"Debt To Equity":0.3,"Days Receivable":36.88,"Days Receivable 3 Years Back":17.86,"EMA 40W":1674.71,"Returns Vs Industry 1Y":-56.5,"Returns Vs Industry 3Y":-7.79,"CWIP":47.54,"Debt":732.32,"Debt 3 Years Back":347.72,"Operating Cash Flow":169.29,"Operating Cash Flow 1 Year Back":282.18,"EPS":52.02,"PAT Growth QoQ":-5.83,"PAT Growth YoY":-3.28,"PAT Growth 3 Years":22.84,"EPS Growth QoQ":-5.89,"EPS Growth YoY":-3.22,"EPS Growth 3 Years":20.51,"EPS Growth 5 Years":46.46,"Promoter Holdings":55.88,"DII Holdings":5.51,"FII Holdings":12.85,"Change In DII Holdings 1 Year":1.1,"Change In DII Holdings 3 Years":5.11,"Change In FII Holdings 1 Year":-2.23,"Change In FII Holdings 3 Years":3.53,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":-10.6,"Equity Shares":73808451.0,"Fixed Assets":939.26,"Fixed Assets 3 Years Back":273.32,"EMA 20D":1770.84,"EMA 50D":1715.94,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":378.33,"PAT 1 Year Back":312.9,"PAT 3 Years Back":204.09,"PAT Latest Quarter":91.81,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"GRAVITA","exchange":"NSE","isETF":false},{"companyId":"NSE:GOODLUCK","Name":"Goodluck India Ltd","Market Capitalization":5024.33,"Close Price":1511.6,"Industry":"Steel - Tubes/Pipes","Price To Earnings":26.95,"Price To Sales":1.23,"Revenue":4100.28,"Revenue Growth TTM":4.18,"PAT Growth TTM":10.23,"Price To Earnings Median 5 Years":17.14,"PEG":0.62,"Price To Earnings Median 3 Years":20.26,"Industry PE Median":22.77,"Industry PS Median":1.42,"EV To EBITDA":15.42,"CFO To PAT":109.67,"Debt To Equity":0.75,"Days Receivable":42.59,"Days Receivable 3 Years Back":41.69,"EMA 40W":1249.06,"Returns Vs Industry 1Y":26.27,"Returns Vs Industry 3Y":31.8,"CWIP":120.95,"Debt":1119.46,"Debt 3 Years Back":597.54,"Operating Cash Flow":200.24,"Operating Cash Flow 1 Year Back":158.26,"EPS":56.08,"PAT Growth QoQ":28.43,"PAT Growth YoY":33.89,"PAT Growth 3 Years":27.64,"EPS Growth QoQ":41.86,"EPS Growth YoY":37.77,"EPS Growth 3 Years":18.96,"EPS Growth 5 Years":33.93,"Promoter Holdings":54.0,"DII Holdings":6.5,"FII Holdings":2.48,"Change In DII Holdings 1 Year":4.44,"Change In DII Holdings 3 Years":6.5,"Change In FII Holdings 1 Year":1.29,"Change In FII Holdings 3 Years":2.43,"Change In Promoter Holdings 1 Year":-2.45,"Change In Promoter Holdings 3 Years":-4.73,"Equity Shares":33238509.0,"Fixed Assets":1202.68,"Fixed Assets 3 Years Back":401.39,"Bulk Block Deals":38.35,"EMA 20D":1515.98,"EMA 50D":1434.04,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":182.58,"PAT 1 Year Back":165.63,"PAT 3 Years Back":87.8,"PAT Latest Quarter":56.1,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-2.45,"symbol":"GOODLUCK","exchange":"NSE","isETF":false},{"companyId":"NSE:GLAND","Name":"Gland Pharma Ltd","Market Capitalization":39257.11,"Close Price":2379.8,"Industry":"Pharma - API & CRAMS","Price To Earnings":38.16,"Price To Sales":6.1,"Revenue":6430.65,"Revenue Growth TTM":14.5,"PAT Growth TTM":47.07,"Price To Earnings Median 5 Years":38.31,"PEG":63.6,"Price To Earnings Median 3 Years":38.44,"Industry PE Median":43.25,"Industry PS Median":6.57,"EV To EBITDA":22.18,"CFO To PAT":100.4,"Debt To Equity":0.02,"Days Receivable":107.35,"Days Receivable 3 Years Back":87.75,"EMA 40W":1998.44,"Returns Vs Industry 1Y":5.21,"Returns Vs Industry 3Y":-7.32,"CWIP":342.18,"Debt":243.36,"Debt 3 Years Back":4.45,"Operating Cash Flow":1031.39,"Operating Cash Flow 1 Year Back":914.73,"EPS":62.36,"PAT Growth QoQ":40.23,"PAT Growth YoY":96.57,"PAT Growth 3 Years":9.57,"EPS Growth QoQ":40.26,"EPS Growth YoY":96.64,"EPS Growth 3 Years":9.54,"EPS Growth 5 Years":-0.23,"Promoter Holdings":51.77,"DII Holdings":30.44,"FII Holdings":8.74,"Change In DII Holdings 1 Year":-2.41,"Change In DII Holdings 3 Years":7.06,"Change In FII Holdings 1 Year":1.35,"Change In FII Holdings 3 Years":5.94,"Change In Promoter Holdings 1 Year":-0.06,"Change In Promoter Holdings 3 Years":-6.09,"Equity Shares":164959682.0,"Fixed Assets":4492.33,"Fixed Assets 3 Years Back":1570.54,"EMA 20D":2422.2,"EMA 50D":2298.46,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":1027.32,"PAT 1 Year Back":698.53,"PAT 3 Years Back":781.04,"PAT Latest Quarter":366.68,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.06,"symbol":"GLAND","exchange":"NSE","isETF":false},{"companyId":"NSE:GRWRHITECH","Name":"Garware Hi Tech Films Ltd","Market Capitalization":16037.32,"Close Price":6903.0,"Industry":"Packaging - Films","Price To Earnings":47.41,"Price To Sales":7.56,"Revenue":2120.11,"Revenue Growth TTM":0.51,"PAT Growth TTM":2.12,"Price To Earnings Median 5 Years":20.68,"PEG":2.17,"Price To Earnings Median 3 Years":24.51,"Industry PE Median":107.92,"Industry PS Median":7.0,"EV To EBITDA":36.27,"CFO To PAT":81.4,"Debt To Equity":0.0,"Days Receivable":9.14,"Days Receivable 3 Years Back":7.6,"EMA 40W":4880.02,"Returns Vs Industry 1Y":33.19,"Returns Vs Industry 3Y":42.07,"CWIP":26.42,"Debt":0.0,"Debt 3 Years Back":140.79,"Operating Cash Flow":275.33,"Operating Cash Flow 1 Year Back":329.72,"EPS":145.59,"PAT Growth QoQ":94.03,"PAT Growth YoY":39.09,"PAT Growth 3 Years":26.74,"EPS Growth QoQ":94.0,"EPS Growth YoY":39.09,"EPS Growth 3 Years":26.74,"EPS Growth 5 Years":21.85,"Promoter Holdings":60.72,"DII Holdings":6.35,"FII Holdings":4.22,"Change In DII Holdings 1 Year":1.46,"Change In DII Holdings 3 Years":4.0,"Change In FII Holdings 1 Year":0.37,"Change In FII Holdings 3 Years":4.11,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.0,"Equity Shares":23232394.0,"Fixed Assets":1577.53,"Fixed Assets 3 Years Back":1467.32,"EMA 20D":6821.5,"EMA 50D":6306.87,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":338.23,"PAT 1 Year Back":331.22,"PAT 3 Years Back":166.14,"PAT Latest Quarter":108.21,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"GRWRHITECH","exchange":"NSE","isETF":false},{"companyId":"BSE:ENTERO","Name":"Entero Healthcare Solutions Ltd","Market Capitalization":5356.82,"Close Price":1230.8,"Industry":"Pharmacy Distribution","Price To Earnings":46.55,"Price To Sales":0.81,"Revenue":6591.21,"Revenue Growth TTM":29.35,"PAT Growth TTM":35.75,"Price To Earnings Median 5 Years":50.24,"PEG":0.74,"Price To Earnings Median 3 Years":50.24,"Industry PE Median":43.8,"Industry PS Median":1.2,"EV To EBITDA":21.69,"CFO To PAT":65.96,"Debt To Equity":0.34,"Days Receivable":67.14,"Days Receivable 3 Years Back":56.95,"EMA 40W":1172.86,"Returns Vs Industry 1Y":2.66,"CWIP":0.0,"Debt":566.68,"Debt 3 Years Back":436.96,"Operating Cash Flow":96.2,"Operating Cash Flow 1 Year Back":-76.87,"EPS":26.44,"PAT Growth QoQ":33.21,"PAT Growth YoY":43.63,"PAT Growth 3 Years":147.35,"EPS Growth QoQ":1.42,"EPS Growth YoY":8.97,"EPS Growth 3 Years":430.01,"EPS Growth 5 Years":146.02,"Promoter Holdings":52.4,"DII Holdings":15.48,"FII Holdings":4.37,"Change In DII Holdings 1 Year":5.29,"Change In FII Holdings 1 Year":-12.84,"Change In Promoter Holdings 1 Year":-0.02,"Equity Shares":43523072.0,"Fixed Assets":960.49,"Fixed Assets 3 Years Back":267.73,"EMA 20D":1201.88,"EMA 50D":1189.14,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":145.84,"PAT 1 Year Back":107.43,"PAT 3 Years Back":-11.1,"PAT Latest Quarter":45.13,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.01,"symbol":"ENTERO","exchange":"BSE","isETF":false},{"companyId":"NSE:DEEPAKFERT","Name":"Deepak Fertilisers & Petrochemicals Corp Ltd","Market Capitalization":19859.73,"Close Price":1573.2,"Industry":"Fertilisers","Price To Earnings":26.94,"Price To Sales":1.73,"Revenue":11506.03,"Revenue Growth TTM":11.99,"PAT Growth TTM":-21.8,"Price To Earnings Median 5 Years":12.7,"PEG":2.12,"Price To Earnings Median 3 Years":17.02,"Industry PE Median":13.72,"Industry PS Median":0.83,"EV To EBITDA":14.9,"CFO To PAT":27.92,"Debt To Equity":0.8,"Days Receivable":74.33,"Days Receivable 3 Years Back":54.6,"EMA 40W":1338.4,"Returns Vs Industry 1Y":6.7,"Returns Vs Industry 3Y":23.06,"CWIP":3046.36,"Debt":5485.82,"Debt 3 Years Back":3698.88,"Operating Cash Flow":206.23,"Operating Cash Flow 1 Year Back":1879.66,"EPS":58.4,"PAT Growth QoQ":-1.48,"PAT Growth YoY":-49.83,"PAT Growth 3 Years":-11.73,"EPS Growth QoQ":-1.52,"EPS Growth YoY":-49.73,"EPS Growth 3 Years":-11.93,"EPS Growth 5 Years":7.09,"Promoter Holdings":45.63,"DII Holdings":14.69,"FII Holdings":10.02,"Change In DII Holdings 1 Year":2.42,"Change In DII Holdings 3 Years":12.62,"Change In FII Holdings 1 Year":-1.23,"Change In FII Holdings 3 Years":0.44,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.17,"Equity Shares":126237825.0,"Fixed Assets":6157.35,"Fixed Assets 3 Years Back":2680.06,"EMA 20D":1569.4,"EMA 50D":1492.6,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":738.76,"PAT 1 Year Back":944.67,"PAT 3 Years Back":1220.88,"PAT Latest Quarter":139.39,"Pledged Percentage 1 Year Back":4.86,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"DEEPAKFERT","exchange":"NSE","isETF":false},{"companyId":"NSE:CYIENTDLM","Name":"Cyient DLM Ltd","Market Capitalization":5322.26,"Close Price":670.45,"Industry":"Consumer Electronics - EMS","Price To Earnings":64.78,"Price To Sales":3.92,"Revenue":1356.86,"Revenue Growth TTM":-11.9,"PAT Growth TTM":26.44,"Price To Earnings Median 5 Years":57.08,"PEG":6.29,"Price To Earnings Median 3 Years":57.08,"Industry PE Median":82.84,"Industry PS Median":3.1,"EV To EBITDA":37.79,"CFO To PAT":73.55,"Debt To Equity":0.17,"Days Receivable":88.92,"Days Receivable 3 Years Back":70.96,"EMA 40W":438.73,"Returns Vs Industry 1Y":30.72,"Returns Vs Industry 3Y":-27.46,"CWIP":2.12,"Debt":172.27,"Debt 3 Years Back":356.05,"Operating Cash Flow":53.9,"Operating Cash Flow 1 Year Back":-62.39,"EPS":10.35,"PAT Growth QoQ":-27.41,"PAT Growth YoY":118.36,"PAT Growth 3 Years":10.3,"EPS Growth QoQ":-27.56,"EPS Growth YoY":118.09,"EPS Growth 3 Years":6.0,"Promoter Holdings":52.11,"DII Holdings":29.19,"FII Holdings":0.25,"Change In DII Holdings 1 Year":1.02,"Change In DII Holdings 3 Years":18.9,"Change In FII Holdings 1 Year":-2.23,"Change In FII Holdings 3 Years":-6.92,"Change In Promoter Holdings 1 Year":-0.01,"Change In Promoter Holdings 3 Years":-14.55,"Equity Shares":79383368.0,"Fixed Assets":354.81,"Fixed Assets 3 Years Back":160.96,"Bulk Block Deals":148.28,"EMA 20D":570.16,"EMA 50D":502.32,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":82.11,"PAT 1 Year Back":73.28,"PAT 3 Years Back":61.2,"PAT Latest Quarter":16.29,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.01,"symbol":"CYIENTDLM","exchange":"NSE","isETF":false},{"companyId":"NSE:CONCORDBIO","Name":"Concord Biotech Ltd","Market Capitalization":13061.33,"Close Price":1248.5,"Industry":"Pharma - API & CRAMS","Price To Earnings":50.38,"Price To Sales":12.38,"Revenue":1054.89,"Revenue Growth TTM":-12.1,"PAT Growth TTM":-30.25,"Price To Earnings Median 5 Years":49.53,"PEG":25.84,"Price To Earnings Median 3 Years":49.53,"Industry PE Median":43.25,"Industry PS Median":6.57,"EV To EBITDA":36.09,"CFO To PAT":102.95,"Debt To Equity":0.0,"Days Receivable":159.23,"Days Receivable 3 Years Back":117.12,"EMA 40W":1292.05,"Returns Vs Industry 1Y":-47.97,"CWIP":79.32,"Debt":2.32,"Debt 3 Years Back":31.55,"Operating Cash Flow":266.88,"Operating Cash Flow 1 Year Back":244.52,"EPS":24.78,"PAT Growth QoQ":39.02,"PAT Growth YoY":-36.98,"PAT Growth 3 Years":2.59,"EPS Growth QoQ":39.14,"EPS Growth YoY":-36.96,"EPS Growth 3 Years":2.59,"EPS Growth 5 Years":-13.69,"Promoter Holdings":44.08,"DII Holdings":9.36,"FII Holdings":7.52,"Change In DII Holdings 1 Year":0.49,"Change In FII Holdings 1 Year":-1.58,"Change In Promoter Holdings 1 Year":0.0,"Equity Shares":104616204.0,"Fixed Assets":793.37,"Fixed Assets 3 Years Back":592.98,"EMA 20D":1298.48,"EMA 50D":1262.87,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":259.23,"PAT 1 Year Back":371.64,"PAT 3 Years Back":240.09,"PAT Latest Quarter":88.47,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"CONCORDBIO","exchange":"NSE","isETF":false},{"companyId":"BSE:COFORGE","Name":"Coforge Ltd","Market Capitalization":65726.3,"Close Price":1484.7,"Industry":"IT - Software","Price To Earnings":32.03,"Price To Sales":4.01,"Revenue":16402.7,"Revenue Growth TTM":35.98,"PAT Growth TTM":86.4,"Price To Earnings Median 5 Years":48.51,"PEG":1.06,"Price To Earnings Median 3 Years":55.54,"Industry PE Median":22.82,"Industry PS Median":2.58,"EV To EBITDA":21.58,"CFO To PAT":102.69,"Debt To Equity":0.04,"Days Receivable":88.34,"Days Receivable 3 Years Back":73.46,"EMA 40W":1459.37,"Returns Vs Industry 1Y":-29.36,"Returns Vs Industry 3Y":-6.1,"CWIP":3.3,"Debt":399.7,"Debt 3 Years Back":562.2,"Operating Cash Flow":1791.7,"Operating Cash Flow 1 Year Back":1237.1,"EPS":46.36,"PAT Growth QoQ":124.54,"PAT Growth YoY":116.79,"PAT Growth 3 Years":32.79,"EPS Growth QoQ":144.7,"EPS Growth YoY":1068.59,"EPS Growth 3 Years":26.85,"EPS Growth 5 Years":25.46,"Promoter Holdings":0.0,"DII Holdings":42.62,"FII Holdings":24.31,"Change In DII Holdings 1 Year":-9.7,"Change In DII Holdings 3 Years":5.9,"Change In FII Holdings 1 Year":-13.11,"Change In FII Holdings 3 Years":-0.47,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":-26.63,"Equity Shares":442690811.0,"Fixed Assets":6759.5,"Fixed Assets 3 Years Back":2311.9,"EMA 20D":1482.75,"EMA 50D":1441.97,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":1744.7,"PAT 1 Year Back":963.5,"PAT 3 Years Back":745.1,"PAT Latest Quarter":666.2,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"COFORGE","exchange":"BSE","isETF":false},{"companyId":"NSE:BIOCON","Name":"Biocon Ltd","Market Capitalization":70671.69,"Close Price":433.65,"Industry":"Pharma - Formulators","Price To Earnings":155.43,"Price To Sales":4.18,"Revenue":16927.0,"Revenue Growth TTM":10.91,"PAT Growth TTM":-74.2,"Price To Earnings Median 5 Years":61.34,"PEG":0.0,"Price To Earnings Median 3 Years":55.22,"Industry PE Median":38.19,"Industry PS Median":4.06,"EV To EBITDA":24.07,"CFO To PAT":540.67,"Debt To Equity":0.45,"Days Receivable":129.09,"Days Receivable 3 Years Back":116.72,"EMA 40W":392.58,"Returns Vs Industry 1Y":-8.3,"Returns Vs Industry 3Y":-8.27,"CWIP":6986.7,"Debt":15434.1,"Debt 3 Years Back":18018.8,"Operating Cash Flow":1994.0,"Operating Cash Flow 1 Year Back":4061.2,"EPS":2.79,"PAT Growth QoQ":483.4,"PAT Growth YoY":-56.77,"PAT Growth 3 Years":-12.57,"EPS Growth QoQ":-26.85,"EPS Growth YoY":-72.57,"EPS Growth 3 Years":-8.38,"EPS Growth 5 Years":-9.13,"Promoter Holdings":44.68,"DII Holdings":23.38,"FII Holdings":8.14,"Change In DII Holdings 1 Year":0.56,"Change In DII Holdings 3 Years":10.82,"Change In FII Holdings 1 Year":2.1,"Change In FII Holdings 3 Years":-1.38,"Change In Promoter Holdings 1 Year":-9.78,"Change In Promoter Holdings 3 Years":-15.96,"Equity Shares":1629694135.0,"Fixed Assets":38859.9,"Fixed Assets 3 Years Back":34197.2,"Bulk Block Deals":5518.02,"EMA 20D":427.67,"EMA 50D":417.07,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":368.8,"PAT 1 Year Back":1429.4,"PAT 3 Years Back":643.0,"PAT Latest Quarter":198.6,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":-0.24,"symbol":"BIOCON","exchange":"NSE","isETF":false},{"companyId":"NSE:ASTRAMICRO","Name":"Astra Microwave Products Ltd","Market Capitalization":17217.33,"Close Price":1813.4,"Industry":"Aerospace & Defence - Equipments","Price To Earnings":89.24,"Price To Sales":14.81,"Revenue":1162.8,"Revenue Growth TTM":10.62,"PAT Growth TTM":25.71,"Price To Earnings Median 5 Years":55.28,"PEG":1.93,"Price To Earnings Median 3 Years":59.22,"Industry PE Median":95.04,"Industry PS Median":11.96,"EV To EBITDA":50.83,"CFO To PAT":200.41,"Debt To Equity":0.22,"Days Receivable":215.85,"Days Receivable 3 Years Back":126.95,"EMA 40W":1242.19,"Returns Vs Industry 1Y":35.13,"Returns Vs Industry 3Y":23.49,"CWIP":9.25,"Debt":287.04,"Debt 3 Years Back":186.3,"Operating Cash Flow":386.73,"Operating Cash Flow 1 Year Back":-90.15,"EPS":20.32,"PAT Growth QoQ":126.4,"PAT Growth YoY":44.21,"PAT Growth 3 Years":40.33,"EPS Growth QoQ":126.37,"EPS Growth YoY":44.19,"EPS Growth 3 Years":36.1,"EPS Growth 5 Years":43.58,"Promoter Holdings":6.54,"DII Holdings":16.09,"FII Holdings":10.74,"Change In DII Holdings 1 Year":1.72,"Change In DII Holdings 3 Years":7.28,"Change In FII Holdings 1 Year":4.28,"Change In FII Holdings 3 Years":7.71,"Change In Promoter Holdings 1 Year":0.0,"Change In Promoter Holdings 3 Years":0.0,"Equity Shares":94945008.0,"Fixed Assets":267.04,"Fixed Assets 3 Years Back":166.83,"EMA 20D":1734.09,"EMA 50D":1573.41,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":192.97,"PAT 1 Year Back":153.51,"PAT 3 Years Back":69.83,"PAT Latest Quarter":105.98,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"ASTRAMICRO","exchange":"NSE","isETF":false},{"companyId":"NSE:ARMANFIN","Name":"Arman Financial Services Ltd","Market Capitalization":2016.0,"Close Price":1917.3,"Industry":"Finance & Investments - Microfinance","Price To Earnings":35.56,"Price To Sales":3.12,"Revenue":645.87,"Revenue Growth TTM":-11.53,"PAT Growth TTM":8.72,"Price To Earnings Median 5 Years":20.87,"PEG":0.89,"Price To Earnings Median 3 Years":14.79,"Industry PE Median":20.07,"Industry PS Median":1.85,"EV To EBITDA":43.04,"CFO To PAT":-841.55,"Debt To Equity":1.9,"Days Receivable 3 Years Back":0.0,"EMA 40W":1635.58,"Returns Vs Industry 1Y":-12.39,"Returns Vs Industry 3Y":5.7,"Debt":1775.72,"Debt 3 Years Back":1604.41,"Operating Cash Flow":-476.4,"Operating Cash Flow 1 Year Back":492.82,"EPS":53.91,"PAT Growth QoQ":84.9,"PAT Growth YoY":221.39,"PAT Growth 3 Years":-11.78,"EPS Growth QoQ":84.86,"EPS Growth YoY":220.95,"EPS Growth 3 Years":-14.78,"EPS Growth 5 Years":33.89,"Promoter Holdings":22.0,"DII Holdings":4.85,"FII Holdings":3.08,"Change In DII Holdings 1 Year":-0.23,"Change In DII Holdings 3 Years":4.04,"Change In FII Holdings 1 Year":1.66,"Change In FII Holdings 3 Years":-1.78,"Change In Promoter Holdings 1 Year":-0.05,"Change In Promoter Holdings 3 Years":-5.27,"Equity Shares":10514761.0,"Fixed Assets":31.62,"Fixed Assets 3 Years Back":6.1,"EMA 20D":1859.08,"EMA 50D":1760.25,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":56.61,"PAT 1 Year Back":52.07,"PAT 3 Years Back":93.81,"PAT Latest Quarter":41.01,"Pledged Percentage 1 Year Back":0.0,"Change In Promoter Holdings Latest Quarter":0.0,"symbol":"ARMANFIN","exchange":"NSE","isETF":false},{"companyId":"NSE:AARTIPHARM","Name":"Aarti Pharmalabs Ltd","Market Capitalization":6110.01,"Close Price":673.8,"Industry":"Pharma - API","Price To Earnings":32.76,"Price To Sales":3.36,"Revenue":1819.44,"Revenue Growth TTM":-13.98,"PAT Growth TTM":-35.86,"Price To Earnings Median 5 Years":24.84,"PEG":0.05,"Price To Earnings Median 3 Years":25.54,"Industry PE Median":40.93,"Industry PS Median":3.35,"EV To EBITDA":18.22,"CFO To PAT":149.92,"Debt To Equity":0.32,"Days Receivable":117.02,"Days Receivable 3 Years Back":84.46,"EMA 40W":715.05,"Returns Vs Industry 1Y":-51.29,"Returns Vs Industry 3Y":-4.39,"CWIP":305.21,"Debt":685.63,"Debt 3 Years Back":215.31,"Operating Cash Flow":261.93,"Operating Cash Flow 1 Year Back":331.56,"EPS":20.57,"PAT Growth QoQ":27.44,"PAT Growth YoY":-30.81,"PAT Growth 3 Years":-3.14,"EPS Growth QoQ":27.41,"EPS Growth YoY":-30.87,"EPS Growth 3 Years":-3.15,"EPS Growth 5 Years":155.58,"Promoter Holdings":42.86,"DII Holdings":7.22,"FII Holdings":8.17,"Change In DII Holdings 1 Year":-0.57,"Change In DII Holdings 3 Years":-3.44,"Change In FII Holdings 1 Year":0.82,"Change In FII Holdings 3 Years":0.74,"Change In Promoter Holdings 1 Year":-0.86,"Change In Promoter Holdings 3 Years":-3.13,"Equity Shares":90679813.0,"Fixed Assets":1525.34,"Fixed Assets 3 Years Back":965.51,"EMA 20D":690.84,"EMA 50D":688.43,"Nifty 500 Returns 3Y":35.86,"Nifty 500 Returns 1Y":-1.66,"Nifty 500 Returns 5Y":67.41,"PAT":174.71,"PAT 1 Year Back":272.4,"PAT 3 Years Back":193.49,"PAT Latest Quarter":61.12,"Pledged Percentage 1 Year Back":0.01,"Change In Promoter Holdings Latest Quarter":-0.23,"symbol":"AARTIPHARM","exchange":"NSE","isETF":false}];
+const DEFAULT_ASOF = "R2R watchlist · Jul 2026";
+// Optional live coverage: if a file named coverage.csv sits next to this page
+// (same repo/folder), the app loads it on open. Replace that one CSV each
+// quarter and every client link picks up the new coverage automatically.
+const COVERAGE_URL = "coverage.csv";
+
+/* ---------- state ---------- */
+let WATCH = [];            // active coverage universe
+let ASOF = DEFAULT_ASOF;
+let LOOKUP = {sym:{}, name:{}};
+let HOLDINGS = [];         // parsed + joined portfolio
+let CUR_FNAME = 'portfolio';
+let SHARED = false;        // true when opened from a shared link (client view)
+let CHARTS = {};
+const F = {                // number formatters
+  inr: n => n==null||isNaN(n) ? "—" : "₹"+Number(n).toLocaleString('en-IN',{maximumFractionDigits:0}),
+  inrL: n => { if(n==null||isNaN(n))return "—"; const a=Math.abs(n); if(a>=1e7)return "₹"+(n/1e7).toFixed(2)+" Cr"; if(a>=1e5)return "₹"+(n/1e5).toFixed(2)+" L"; return "₹"+Number(n).toLocaleString('en-IN',{maximumFractionDigits:0}); },
+  pct: (n,d=1) => n==null||isNaN(n) ? "—" : (n>=0?"+":"")+Number(n).toFixed(d)+"%",
+  num: (n,d=1) => n==null||isNaN(n) ? "—" : Number(n).toFixed(d),
+  x: n => n==null||isNaN(n) ? "—" : Number(n).toFixed(1)+"x",
+};
+const COL = {emerald:'#2ecc71',blue:'#5b8def',amber:'#f0a500',red:'#ff5c5c',violet:'#a274ff',mut:'#8494a8',line:'#1c2636'};
+Chart.defaults.font.family = "'DM Sans',sans-serif";
+Chart.defaults.color = '#8494a8';
+Chart.defaults.borderColor = 'rgba(38,50,74,.55)';
+Chart.defaults.maintainAspectRatio = false;   // fill the fixed-height .chart-box instead of ballooning to width
+Chart.defaults.responsive = true;
+
+/* ---------- coverage load / persist ---------- */
+function loadCoverage(){
+  try{
+    const saved = localStorage.getItem('r2r_watchlist');
+    const savedDate = localStorage.getItem('r2r_asof');
+    if(saved){ WATCH = JSON.parse(saved); ASOF = savedDate||ASOF; }
+    else { WATCH = DEFAULT_WATCHLIST; }
+  }catch(e){ WATCH = DEFAULT_WATCHLIST; }
+  buildLookup();
+  document.getElementById('asofTop').innerHTML = "Coverage: <b>"+ASOF+"</b>";
+}
+function buildLookup(){
+  LOOKUP = {sym:{}, name:{}};
+  WATCH.forEach(w=>{
+    if(w.symbol) LOOKUP.sym[normSym(w.symbol)] = w;
+    if(w.Name) LOOKUP.name[normName(w.Name)] = w;
+  });
+}
+const normSym = s => String(s||'').toUpperCase().trim()
+  .replace(/\.(NS|BO|BSE|NSE)$/,'').replace(/-(EQ|BE|BZ|SM|ST)$/,'').replace(/[^A-Z0-9&]/g,'');
+const normName = s => String(s||'').toLowerCase()
+  .replace(/\bltd\b|\blimited\b|\bthe\b|\bindia\b|&|\.|,|-/g,' ').replace(/\s+/g,' ').trim();
+
+/* ============================================================
+   BROKER FILE PARSING
+   ============================================================ */
+const FIELD_HINTS = {
+  isin:   [/^isin$/i,/isin/i],
+  symbol: [/^symbol$/i,/^instrument$/i,/tradingsymbol/i,/^scrip/i,/^ticker/i],
+  name:   [/stock name/i,/company/i,/security name/i,/^name$/i,/instrument name/i,/scrip name/i],
+  qty:    [/quantity available/i,/qty\.? available/i,/^quantity$/i,/^qty\.?$/i,/holding qty/i,/^shares$/i,/^units$/i,/net qty/i],
+  avg:    [/average buy price/i,/avg\.? ?cost/i,/average price/i,/avg\.? ?price/i,/buy avg/i,/avg buy/i,/^avg\.?$/i],
+  ltp:    [/^ltp$/i,/last price/i,/previous closing price/i,/current price/i,/market price/i,/^cmp$/i,/close price/i,/prev.*clos/i],
+  curval: [/cur\.? ?val/i,/current value/i,/market value/i,/present value/i,/holding value/i,/cur value/i],
+  pnl:    [/unrealized p&l$/i,/unrealised p&l$/i,/^p&l$/i,/^pnl$/i,/^profit/i,/net p&l/i],
+};
+function matchField(header){
+  const h = String(header||'').trim();
+  for(const [field,pats] of Object.entries(FIELD_HINTS)){
+    if(pats.some(p=>p.test(h))) return field;
+  }
+  return null;
+}
+// find header row inside array-of-arrays (for xlsx with preamble)
+function findHeaderRow(rows){
+  let best=-1,bestScore=0;
+  for(let i=0;i<Math.min(rows.length,25);i++){
+    const cells=rows[i]||[];
+    const matched=new Set();
+    cells.forEach(c=>{const f=matchField(c); if(f)matched.add(f);});
+    const score=matched.size + (matched.has('qty')?1:0) + (matched.has('symbol')||matched.has('name')?1:0);
+    if(score>bestScore){bestScore=score;best=i;}
+  }
+  return bestScore>=2 ? best : -1;
+}
+function rowsToObjects(rows){
+  const hr=findHeaderRow(rows);
+  if(hr<0) throw new Error("Couldn't find a holdings table in this file. Make sure it's a broker holdings export with columns like Symbol, Quantity and Average Price.");
+  const headers=rows[hr].map(x=>String(x==null?'':x).trim());
+  const objs=[];
+  for(let i=hr+1;i<rows.length;i++){
+    const r=rows[i]; if(!r||r.every(c=>c==null||c===''))continue;
+    const o={}; headers.forEach((h,j)=>o[h]=r[j]);
+    objs.push(o);
+  }
+  return {objs,headers};
+}
+function mapColumns(headers){
+  const map={};
+  headers.forEach(h=>{const f=matchField(h); if(f && !map[f]) map[f]=h;});
+  return map;
+}
+const toNum = v => {
+  if(v==null) return null;
+  if(typeof v==='number') return v;
+  const s=String(v).replace(/[₹,%\s]/g,'').replace(/[()]/g,m=>m==='('?'-':'');
+  const n=parseFloat(s); return isNaN(n)?null:n;
+};
+function normalizeHoldings(objs,map){
+  const out=[];
+  objs.forEach(o=>{
+    const sym = map.symbol? o[map.symbol] : null;
+    const nm  = map.name? o[map.name] : null;
+    const isin= map.isin? o[map.isin] : null;
+    let qty = map.qty? toNum(o[map.qty]) : null;
+    const avg = map.avg? toNum(o[map.avg]) : null;
+    let ltp = map.ltp? toNum(o[map.ltp]) : null;
+    let cur = map.curval? toNum(o[map.curval]) : null;
+    let pnl = map.pnl? toNum(o[map.pnl]) : null;
+    // must have an identity + qty (or value)
+    if(!(sym||nm||isin)) return;
+    if((qty==null||qty===0) && (cur==null||cur===0)) return;
+    out.push({rawSym:sym,rawName:nm,isin,qty,avg,ltp,cur,pnl});
+  });
+  return out;
+}
+/* join to coverage + derive values */
+function joinAndDerive(rows){
+  const joined = rows.map(r=>{
+    let w = null;
+    if(r.rawSym) w = LOOKUP.sym[normSym(r.rawSym)] || null;
+    if(!w && r.rawName) w = LOOKUP.name[normName(r.rawName)] || null;
+    // derive price + values
+    const cover = w;
+    let ltp = r.ltp;
+    if((ltp==null) && cover) ltp = cover['Close Price'];
+    let cur = r.cur;
+    if(cur==null && r.qty!=null && ltp!=null) cur = r.qty*ltp;
+    let invested = (r.qty!=null && r.avg!=null) ? r.qty*r.avg : null;
+    let pnl = r.pnl;
+    if(pnl==null && cur!=null && invested!=null) pnl = cur-invested;
+    const pnlPct = (invested!=null && invested!==0 && pnl!=null) ? (pnl/invested*100) : null;
+    return {
+      name: (cover&&cover.Name) || r.rawName || r.rawSym || r.isin,
+      symbol: (cover&&cover.symbol) || (r.rawSym?normSym(r.rawSym):(r.isin||'')),
+      isin: r.isin, qty:r.qty, avg:r.avg, ltp, cur, invested, pnl, pnlPct,
+      cover, covered: !!cover
+    };
+  });
+  const totalCur = joined.reduce((s,h)=>s+(h.cur||0),0) || 1;
+  joined.forEach(h=> h.weight = (h.cur||0)/totalCur*100);
+  // sub-scores for covered non-ETF
+  joined.forEach(h=>{ if(h.covered && !h.cover.isETF) h.scores = subScores(h.cover); });
+  return joined;
+}
+
+/* ============================================================
+   SCORING  (0-100, higher = stronger on that axis)
+   ============================================================ */
+function band(v,stops){ // stops: [[threshold,score],...] descending by threshold
+  if(v==null||isNaN(v)) return null;
+  for(const [t,s] of stops){ if(v>=t) return s; }
+  return stops[stops.length-1][1];
+}
+/* ---------- PEG (price vs growth) — uses the provided PEG (durable growth) ---------- */
+function pegOf(w){
+  const pe = w['Price To Earnings'];
+  const peg = w['PEG'];
+  const g = (w['EPS Growth 3 Years']!=null) ? w['EPS Growth 3 Years'] : w['PAT Growth TTM'];
+  if(peg!=null && peg>0) return {peg, pe, g};
+  if(pe==null || pe<=0)  return {peg:null, reason:'no-earnings', g};
+  if(g!=null && g<=0)    return {peg:null, reason:'declining', g};
+  return {peg:null, reason:'no-growth', g};
+}
+// current PE vs its own 5Y history and vs industry (negative % = cheaper)
+function peVsHist(w){const pe=w['Price To Earnings'],m=w['Price To Earnings Median 5 Years'];return(pe==null||m==null||m<=0)?null:(pe-m)/m*100;}
+function peVsInd(w){const pe=w['Price To Earnings'],m=w['Industry PE Median'];return(pe==null||m==null||m<=0)?null:(pe-m)/m*100;}
+function pegLabel(r){
+  if(!r) return {t:'—',c:'m'};
+  if(r.reason==='declining')  return {t:'Earnings falling',c:'r'};
+  if(r.reason==='no-earnings')return {t:'No profit yet',c:'m'};
+  if(r.reason==='no-growth')  return {t:'—',c:'m'};
+  if(r.peg<=1.0) return {t:'Undervalued',c:'g'};
+  if(r.peg<=2.0) return {t:'Fairly valued',c:'a'};
+  return {t:'Expensive',c:'r'};
+}
+function pegScore(r,w){ // 0-100, higher = cheaper for the growth
+  if(!r) return null;
+  if(r.reason==='declining') return 18;      // paying up for shrinking earnings
+  if(r.reason==='no-earnings') return null;   // can't value on PEG
+  if(r.reason==='no-growth'){                 // fall back to plain PE band
+    return band(w['Price To Earnings'],[[90,12],[60,26],[45,40],[32,55],[22,72],[15,86],[8,100],[0,90],[-1e9,20]]);
+  }
+  return band(r.peg,[[5.01,12],[3.01,22],[2.01,36],[1.51,52],[1.01,66],[0.76,82],[0.51,92],[-1e9,100]]);
+}
+const pegDisp = r => (!r||r.peg==null) ? null : (r.peg>10 ? '>10' : r.peg.toFixed(2));
+
+function subScores(w){
+  // QUALITY — cash conversion, leverage & balance-sheet trend
+  const q=[];
+  q.push(band(w['CFO To PAT'],[[110,100],[85,88],[65,74],[45,58],[25,40],[0,22],[-1e9,8]]));
+  q.push(band(w['Debt To Equity'],[[2,15],[1.2,38],[0.7,60],[0.4,78],[0.15,92],[0,100],[-1e9,60]]));
+  const dn=w['Debt'], db=w['Debt 3 Years Back'];
+  if(dn!=null && db!=null && db>0) q.push(band(dn/db,[[1.6,25],[1.2,45],[0.95,62],[0.7,80],[-1e9,95]]));
+  const rc=w['Days Receivable'], rb=w['Days Receivable 3 Years Back'];
+  if(rc!=null && rb!=null && rb>0) q.push(band(rc/rb,[[1.4,30],[1.15,50],[0.95,70],[-1e9,88]]));
+  if(w['Pledged Percentage 1 Year Back']!=null){const p=w['Pledged Percentage 1 Year Back']; q.push(p<=0?92:(p<10?55:22));}
+  const quality = avg(q);
+  // GROWTH — favour durable multi-year
+  const g=[];
+  g.push(band(w['PAT Growth TTM'],[[40,100],[25,86],[15,72],[8,58],[2,44],[-5,26],[-1e9,8]]));
+  g.push(band(w['EPS Growth 3 Years'],[[35,100],[24,88],[16,74],[10,60],[4,44],[0,28],[-1e9,10]]));
+  g.push(band(w['EPS Growth 5 Years'],[[30,100],[20,86],[14,72],[9,58],[4,42],[0,28],[-1e9,12]]));
+  g.push(band(w['PAT Growth 3 Years'],[[35,100],[24,86],[15,72],[8,58],[2,42],[-1e9,14]]));
+  const growth = avg(g);
+  // VALUATION (higher = cheaper) — PEG (double weight) + own-history band + industry band
+  const v=[]; const ps=pegScore(pegOf(w), w);
+  if(ps!=null){ v.push(ps); v.push(ps); }
+  const ph=peVsHist(w); if(ph!=null) v.push(band(ph,[[60,15],[30,32],[10,50],[-10,68],[-30,86],[-1e9,100]]));
+  const pi=peVsInd(w);  if(pi!=null) v.push(band(pi,[[60,18],[25,38],[5,55],[-15,74],[-40,92],[-1e9,100]]));
+  const valuation = v.length? avg(v) : null;
+  // MOMENTUM — relative strength vs sector + trend (price vs EMAs)
+  const m=[];
+  m.push(band(w['Returns Vs Industry 1Y'],[[40,100],[20,86],[8,70],[0,56],[-10,40],[-25,26],[-1e9,10]]));
+  if(w['Returns Vs Industry 3Y']!=null) m.push(band(w['Returns Vs Industry 3Y'],[[60,100],[25,82],[5,64],[0,52],[-20,34],[-1e9,16]]));
+  const cp=w['Close Price'];
+  if(cp!=null && w['EMA 40W']!=null) m.push(cp>=w['EMA 40W']?85:35);
+  if(cp!=null && w['EMA 50D']!=null) m.push(cp>=w['EMA 50D']?80:40);
+  const momentum = avg(m);
+  const parts=[quality,growth,valuation,momentum].filter(x=>x!=null);
+  const composite = parts.length? Math.round(avg(parts)) : null;
+  return {quality:r0(quality),growth:r0(growth),valuation:r0(valuation),momentum:r0(momentum),composite};
+}
+const avg = arr => { const a=arr.filter(x=>x!=null&&!isNaN(x)); return a.length? a.reduce((s,x)=>s+x,0)/a.length : null; };
+const r0 = x => x==null?null:Math.round(x);
+
+/* ---------- computed coverage tier (replaces Tickertape Status) ---------- */
+function tierMeta(score){
+  if(score==null) return {label:'In coverage',cls:'b-uncov',col:COL.mut};
+  if(score>=68) return {label:'Strong',cls:'b-out',col:COL.emerald};
+  if(score>=54) return {label:'Solid',cls:'b-consol',col:COL.blue};
+  if(score>=42) return {label:'Watch',cls:'b-accum',col:COL.amber};
+  return {label:'Weak',cls:'b-under',col:COL.red};
+}
+function statusMeta(w){
+  if(!w || w.isETF) return null;
+  if(w.__sc===undefined) w.__sc = subScores(w);
+  return tierMeta(w.__sc.composite);
+}
+/* plain-language, descriptive (non-prescriptive) read */
+function signalText(h){
+  const w=h.cover, sc=h.scores;
+  if(w && w.isETF) return "Passive fund — tracks a sector/theme basket; no single-stock fundamentals apply. Judge it on the sector's outlook and its expense ratio.";
+  if(!sc) return "Covered, but key fundamentals weren't disclosed in the latest scan — read the desk note for context.";
+  const bits=[];
+  // quality — cash conversion & balance sheet
+  if(sc.quality>=75){
+    const cfo=w['CFO To PAT']; bits.push(cfo!=null?`clean cash conversion (CFO ${F.num(cfo,0)}% of PAT), low leverage`:`healthy balance sheet, low leverage`);
+  } else if(sc.quality<45){
+    const cfo=w['CFO To PAT']; bits.push(cfo!=null&&cfo<60?`weaker cash conversion (CFO ${F.num(cfo,0)}% of PAT)`:`stretched balance sheet`);
+  }
+  // valuation (provided PEG + context)
+  const pg=pegOf(w);
+  if(pg.peg!=null){
+    const pegT=pegDisp(pg);
+    if(pg.peg<=1.0) bits.push(`undervalued for its growth (PEG ${pegT})`);
+    else if(pg.peg>2.0) bits.push(`expensive for its growth (PEG ${pegT})`);
+    else bits.push(`fairly valued for its growth (PEG ${pegT})`);
+    const ph=peVsHist(w); if(ph!=null && Math.abs(ph)>=15) bits.push(ph<0?`trading below its own 5-yr average P/E`:`richer than its own 5-yr average P/E`);
+  } else if(pg.reason==='declining' && w['Price To Earnings']!=null){
+    bits.push(`earnings falling — pricey at ${F.x(w['Price To Earnings'])} despite the drop`);
+  } else if(pg.reason==='no-earnings'){
+    bits.push(`not yet profitable — can't be valued on earnings`);
+  }
+  // growth
+  if(sc.growth>=75) bits.push(`strong growth (PAT ${F.pct(w['PAT Growth TTM'],0)} TTM, EPS ${F.pct(w['EPS Growth 3 Years'],0)}/yr over 3Y)`);
+  else if(sc.growth<40) bits.push(`muted growth (EPS ${F.pct(w['EPS Growth 3 Years'],0)}/yr over 3Y)`);
+  // momentum — relative to sector
+  if(sc.momentum>=75) bits.push(`outpacing its sector (${F.pct(w['Returns Vs Industry 1Y'],0)} vs industry, 1Y)`);
+  else if(sc.momentum<40) bits.push(`lagging its sector (${F.pct(w['Returns Vs Industry 1Y'],0)} vs industry, 1Y)`);
+  // smart money — past year
+  const fq=w['Change In FII Holdings 1 Year'], dq=w['Change In DII Holdings 1 Year'];
+  const inst=(fq||0)+(dq||0);
+  if(inst>=2) bits.push(`institutions adding (${F.pct(inst,1)} FII+DII over the past year)`);
+  else if(inst<=-2) bits.push(`institutions trimming (${F.pct(inst,1)} FII+DII over the past year)`);
+  const cap = bits.length? bits[0][0].toUpperCase()+bits[0].slice(1) : "In coverage";
+  return cap + (bits.length>1 ? "; "+bits.slice(1).join("; ")+"." : ".");
+}
+
+/* ============================================================
+   FILE INTAKE
+   ============================================================ */
+function handleFile(file){
+  showLoad(true); showErr('');
+  const name=file.name.toLowerCase();
+  const done = rows2d => {
+    try{
+      const {objs}=rowsToObjects(rows2d);
+      const map=mapColumns(Object.keys(objs[0]||{}));
+      if(!map.qty && !map.curval) throw new Error("No quantity or value column found. This doesn't look like a holdings export.");
+      const norm=normalizeHoldings(objs,map);
+      if(!norm.length) throw new Error("No holdings rows could be read from this file.");
+      HOLDINGS=joinAndDerive(norm);
+      renderApp(file.name);
+    }catch(e){ showLoad(false); showErr(e.message||"Couldn't parse this file."); }
+  };
+  if(name.endsWith('.xlsx')||name.endsWith('.xls')){
+    const rd=new FileReader();
+    rd.onload=e=>{ try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:null});
+      done(rows);
+    }catch(err){showLoad(false);showErr("Couldn't read the Excel file. Try exporting as CSV.");}};
+    rd.onerror=()=>{showLoad(false);showErr("Couldn't read the file.");};
+    rd.readAsArrayBuffer(file);
+  } else {
+    Papa.parse(file,{skipEmptyLines:true,complete:res=>done(res.data),
+      error:()=>{showLoad(false);showErr("Couldn't read the CSV file.");}});
+  }
+}
+const showLoad=b=>document.getElementById('load').style.display=b?'block':'none';
+const showErr=m=>{const e=document.getElementById('err');e.style.display=m?'block':'none';e.textContent=m;showLoad(false);};
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function renderApp(fname){
+  CUR_FNAME = fname || CUR_FNAME;
+  showLoad(false);
+  document.getElementById('landing').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('btnPdf').style.display='';
+  if(SHARED){
+    // client view — only the PDF button
+    document.getElementById('btnCoverage').style.display='none';
+    document.getElementById('btnShare').style.display='none';
+    document.getElementById('btnNew').style.display='none';
+  } else {
+    document.getElementById('btnShare').style.display='';
+    document.getElementById('btnNew').style.display='';
+  }
+  window.scrollTo(0,0);
+
+  const covered=HOLDINGS.filter(h=>h.covered);
+  const totInv=HOLDINGS.reduce((s,h)=>s+(h.invested||0),0);
+  const totCur=HOLDINGS.reduce((s,h)=>s+(h.cur||0),0);
+  const totPnl=HOLDINGS.reduce((s,h)=>s+(h.pnl||0),0);
+  const covVal=covered.reduce((s,h)=>s+(h.cur||0),0);
+  const covPct= totCur? covVal/totCur*100 : 0;
+  const wScore = weightedScore(covered);
+
+  // meta
+  const today=new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+  document.getElementById('coverMeta').textContent=`Generated ${today} · Coverage as of ${ASOF} · Source file: ${fname}`;
+  document.getElementById('footMeta').textContent=`Report generated ${today}. Coverage universe of ${WATCH.length} stocks as of ${ASOF}.`;
+  document.getElementById('ovSub').textContent=`${HOLDINGS.length} holdings read · ${covered.length} inside research coverage · ${HOLDINGS.length-covered.length} outside.`;
+
+  // KPIs
+  const pnlCls=totPnl>=0?'pos':'neg';
+  const kpis=[
+    {lab:'Current value',val:F.inrL(totCur),sub:`Invested ${F.inrL(totInv)}`,hi:true},
+    {lab:'Overall P&L',val:F.inrL(totPnl),sub:F.pct(totInv?totPnl/totInv*100:null),cls:pnlCls,hi:true},
+    {lab:'Holdings',val:HOLDINGS.length,sub:`${covered.length} covered`},
+    {lab:'In coverage',val:F.num(covPct,0)+'%',sub:'of portfolio value',cls:'amb'},
+    {lab:'Portfolio health score',val:wScore!=null?wScore:'—',sub:wScore!=null?'0–100, value-weighted covered book':'no scored holdings',cls:'amb'},
+    {lab:'Top position',val:F.num(Math.max(...HOLDINGS.map(h=>h.weight||0)),0)+'%',sub:topName()},
+  ];
+  document.getElementById('kpiGrid').innerHTML=kpis.map(k=>`
+    <div class="kpi ${k.hi?'hi':''}">
+      <div class="lab">${k.lab}</div>
+      <div class="val ${k.val.length>7?'sm':''} ${k.cls||''}">${k.val}</div>
+      <div class="sub">${k.sub||''}</div>
+    </div>`).join('');
+
+  buildCharts(covered,covPct,totCur);
+  renderAllocation(covered,totCur);
+  renderQualityValue(covered);
+  renderHoldings('all','weight');
+  renderPromoter();
+  const emaData=renderEMA();
+  buildTrendCharts(covered,emaData);
+  renderUniverse();
+  initTabs();
+}
+function topName(){ let t=HOLDINGS[0]; HOLDINGS.forEach(h=>{if((h.weight||0)>(t.weight||0))t=h;}); return t?t.name.slice(0,20):''; }
+function weightedScore(covered){
+  let ws=0,wsum=0;
+  covered.forEach(h=>{ const sc=h.scores&&h.scores.composite; if(sc!=null){ws+=sc*(h.cur||0);wsum+=(h.cur||0);}});
+  return wsum? Math.round(ws/wsum) : null;
+}
+
+/* ---------- charts ---------- */
+function destroy(id){ if(CHARTS[id]){CHARTS[id].destroy(); delete CHARTS[id];} }
+function buildCharts(covered,covPct,totCur){
+  const gridC='rgba(38,50,74,.45)';
+  const totPnlAbs=HOLDINGS.reduce((s,h)=>s+Math.abs(h.pnl||0),0);
+  // status mix (value-weighted)
+  const smap={};
+  covered.forEach(h=>{const m=statusMeta(h.cover); const key=m?m.label:'Not scored'; smap[key]=(smap[key]||0)+(h.cur||0);});
+  const scol={'Strong':COL.emerald,'Solid':COL.blue,'Watch':COL.amber,'Weak':COL.red,'Not scored':COL.mut,'In coverage':COL.mut};
+  destroy('cStatus');
+  CHARTS.cStatus=new Chart(el('cStatus'),{type:'doughnut',
+    data:{labels:Object.keys(smap),datasets:[{data:Object.values(smap),backgroundColor:Object.keys(smap).map(k=>scol[k]||COL.mut),borderColor:'#0b1220',borderWidth:2}]},
+    options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{padding:12,boxWidth:10,boxHeight:10,usePointStyle:true,font:{size:11}}},
+      tooltip:{callbacks:{label:c=>c.label+': '+F.inrL(c.parsed)+' ('+F.num(c.parsed/(totCur||1)*100,1)+'%)'}}}}});
+  // P&L contribution
+  const contrib=HOLDINGS.filter(h=>h.pnl!=null&&h.pnl!==0).sort((a,b)=>Math.abs(b.pnl)-Math.abs(a.pnl)).slice(0,12);
+  destroy('cPnlContrib');
+  CHARTS.cPnlContrib=new Chart(el('cPnlContrib'),{type:'bar',
+    data:{labels:contrib.map(h=>h.symbol),datasets:[{data:contrib.map(h=>h.pnl),backgroundColor:contrib.map(h=>h.pnl>=0?COL.emerald:COL.red),borderRadius:4}]},
+    options:{indexAxis:'y',plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>F.inrL(c.parsed.x)+(totPnlAbs?'  ·  '+F.num(Math.abs(c.parsed.x)/totPnlAbs*100,0)+'% of book P&L':'')}}},
+      scales:{x:{grid:{color:gridC},ticks:{callback:v=>F.inrL(v)}},y:{grid:{display:false}}}}});
+  // sector doughnut (compact; numbers live in the table)
+  const sec={};
+  covered.forEach(h=>{const s=h.cover.Industry||'Other';sec[s]=(sec[s]||0)+(h.cur||0);});
+  const secArr=Object.entries(sec).sort((a,b)=>b[1]-a[1]);
+  const palette=[COL.amber,COL.blue,COL.emerald,COL.violet,'#e07a5f','#4ec3c9','#d4b04a','#9b7ede','#5f8fd4','#c96f6f'];
+  destroy('cSector');
+  CHARTS.cSector=new Chart(el('cSector'),{type:'doughnut',
+    data:{labels:secArr.map(s=>s[0]),datasets:[{data:secArr.map(s=>s[1]),backgroundColor:secArr.map((_,i)=>palette[i%palette.length]),borderColor:'#0b1220',borderWidth:2}]},
+    options:{cutout:'58%',plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.label+': '+F.num(c.parsed/(secTotal(secArr)||1)*100,1)+'% · '+F.inrL(c.parsed)}}}}});
+  // return vs sector, 1Y
+  const rr=covered.filter(h=>h.cover['Returns Vs Industry 1Y']!=null).sort((a,b)=>b.cover['Returns Vs Industry 1Y']-a.cover['Returns Vs Industry 1Y']);
+  destroy('cRet');
+  CHARTS.cRet=new Chart(el('cRet'),{type:'bar',
+    data:{labels:rr.map(h=>h.symbol),datasets:[{data:rr.map(h=>h.cover['Returns Vs Industry 1Y']),
+      backgroundColor:rr.map(h=>h.cover['Returns Vs Industry 1Y']>=0?COL.emerald:COL.red),borderRadius:4}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>F.pct(c.parsed.y)}}},
+      scales:{y:{grid:{color:gridC},ticks:{callback:v=>v+'%'}},x:{grid:{display:false},ticks:{font:{size:9},maxRotation:70,minRotation:45}}}}});
+  // smart money flow (FII+DII, past year)
+  const fl=covered.filter(h=>!h.cover.isETF && (h.cover['Change In FII Holdings 1 Year']!=null||h.cover['Change In DII Holdings 1 Year']!=null))
+    .map(h=>({sym:h.symbol,fii:h.cover['Change In FII Holdings 1 Year']||0,dii:h.cover['Change In DII Holdings 1 Year']||0}))
+    .sort((a,b)=>(b.fii+b.dii)-(a.fii+a.dii));
+  destroy('cFlow');
+  CHARTS.cFlow=new Chart(el('cFlow'),{type:'bar',
+    data:{labels:fl.map(x=>x.sym),datasets:[
+      {label:'FII Δ',data:fl.map(x=>x.fii),backgroundColor:COL.blue,borderRadius:3},
+      {label:'DII Δ',data:fl.map(x=>x.dii),backgroundColor:COL.amber,borderRadius:3}]},
+    options:{plugins:{legend:{position:'top',labels:{boxWidth:10,boxHeight:10,usePointStyle:true}},
+      tooltip:{callbacks:{label:c=>c.dataset.label+': '+F.pct(c.parsed.y,2)}}},
+      scales:{x:{stacked:true,grid:{display:false},ticks:{font:{size:9},maxRotation:70,minRotation:45}},
+              y:{stacked:true,grid:{color:gridC},title:{display:true,text:'Δ holding %'}}}}});
+}
+/* ---------- promoter + 40W EMA charts ---------- */
+function buildTrendCharts(covered,ema){
+  const gridC='rgba(38,50,74,.45)';
+  // promoter stake bar (covered holdings, sorted by weight)
+  const ph=covered.filter(h=>h.cover&&!h.cover.isETF&&h.cover['Promoter Holdings']!=null)
+    .sort((a,b)=>(b.weight||0)-(a.weight||0)).slice(0,14);
+  destroy('cProm');
+  if(ph.length){
+    CHARTS.cProm=new Chart(el('cProm'),{type:'bar',
+      data:{labels:ph.map(h=>h.symbol),datasets:[{data:ph.map(h=>h.cover['Promoter Holdings']),
+        backgroundColor:ph.map(h=>{const d=h.cover['Change In Promoter Holdings 1 Year'];return (d!=null&&d<0)?COL.amber:COL.emerald;}),borderRadius:4}]},
+      options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{
+        const w=ph[c.dataIndex].cover, d=w['Change In Promoter Holdings 1 Year'];
+        return 'Promoter '+F.num(c.parsed.y,1)+'%'+(d!=null?'  ·  Δ1Y '+F.pct(d,2):'');}}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:70,minRotation:45}},
+                y:{grid:{color:gridC},ticks:{callback:v=>v+'%'},title:{display:true,text:'Promoter holding %'}}}}});
+  }
+  // client book: above vs below 40W EMA (by value)
+  destroy('cEma');
+  if(ema && (ema.valAbove+ema.valBelow)>0){
+    CHARTS.cEma=new Chart(el('cEma'),{type:'doughnut',
+      data:{labels:['Above 40W EMA','Below 40W EMA'],datasets:[{data:[ema.valAbove,ema.valBelow],
+        backgroundColor:[COL.emerald,COL.red],borderColor:'#0b1220',borderWidth:2}]},
+      options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{padding:12,boxWidth:10,boxHeight:10,usePointStyle:true,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.label+': '+F.inrL(c.parsed)+' ('+F.num(c.parsed/((ema.valAbove+ema.valBelow)||1)*100,1)+'%)'}}}}});
+  }
+  // universe: above vs below (by count)
+  destroy('cEmaUni');
+  if(ema && (ema.uAbove+ema.uBelow)>0){
+    CHARTS.cEmaUni=new Chart(el('cEmaUni'),{type:'doughnut',
+      data:{labels:['Above 40W EMA','Below 40W EMA'],datasets:[{data:[ema.uAbove,ema.uBelow],
+        backgroundColor:[COL.emerald,COL.red],borderColor:'#0b1220',borderWidth:2}]},
+      options:{cutout:'62%',plugins:{legend:{position:'bottom',labels:{padding:12,boxWidth:10,boxHeight:10,usePointStyle:true,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>c.label+': '+c.parsed+' stocks ('+F.num(c.parsed/((ema.uAbove+ema.uBelow)||1)*100,0)+'%)'}}}}});
+  }
+}
+function weightedFund(covered){
+  const acc={roce:0,roe:0,opm:0,rev:0,pat:0,pe:0}, wsum={roce:0,roe:0,opm:0,rev:0,pat:0,pe:0};
+  const K={roce:'ROCE',roe:'ROE',opm:'OPM',rev:'Revenue Growth TTM',pat:'PAT Growth TTM',pe:'Price To Earnings'};
+  covered.forEach(h=>{ if(h.cover.isETF)return; const w=h.cur||0;
+    for(const k in K){const v=h.cover[K[k]]; if(v!=null){acc[k]+=v*w;wsum[k]+=w;}}});
+  const o={}; for(const k in K) o[k]= wsum[k]? +(acc[k]/wsum[k]).toFixed(1):null; return o;
+}
+const el=id=>document.getElementById(id);
+const secTotal=arr=>arr.reduce((s,x)=>s+x[1],0);
+
+/* ---------- quality & price check (plain language) ---------- */
+function qLabel(s){ // business quality
+  if(s==null) return {t:'—',c:'m'};
+  if(s>=62) return {t:'Strong',c:'g'};
+  if(s>=45) return {t:'Average',c:'a'};
+  return {t:'Weak',c:'r'};
+}
+function qvTakeaway(q,v){ // q,v are label codes g/a/r
+  const M={
+    'g|g':'Good business, cheap for the growth it\u2019s delivering — the sweet spot.',
+    'g|a':'Strong business, fairly priced for its growth. Sensible to hold.',
+    'g|r':'Excellent business, but the price is steep even after its growth.',
+    'a|g':'Average business, but cheap for the growth on offer.',
+    'a|a':'Average business at a fair price for its growth.',
+    'a|r':'Paying a premium that the growth doesn\u2019t quite justify.',
+    'r|g':'Optically cheap for its growth, but the fundamentals are weak.',
+    'r|a':'Weak fundamentals; the price isn\u2019t low enough to make up for it.',
+    'r|r':'Expensive for the growth and a weak business — worth a closer look.',
+  };
+  return M[q+'|'+v] || 'In coverage.';
+}
+function priceLabelFromPeg(peg){
+  if(peg==null) return {t:'—',c:'m'};
+  if(peg<=1.0) return {t:'Undervalued',c:'g'};
+  if(peg<=2.0) return {t:'Fairly valued',c:'a'};
+  return {t:'Expensive',c:'r'};
+}
+function renderQualityValue(covered){
+  const stocks=covered.filter(h=>!h.cover.isETF && h.scores);
+  // attach PEG to each
+  stocks.forEach(h=>{ h._peg = pegOf(h.cover); });
+
+  // ---- portfolio verdict ----
+  let qw=0,wsum=0;
+  stocks.forEach(h=>{const w=h.cur||0; qw+=h.scores.quality*w; wsum+=w;});
+  const pQ=wsum?qw/wsum:null; const ql=qLabel(pQ);
+  // value-weighted PEG (assessable only, per-stock capped at 6 to avoid skew)
+  let pw=0,psum=0;
+  stocks.forEach(h=>{ if(h._peg.peg!=null){ const w=h.cur||0; pw+=Math.min(h._peg.peg,6)*w; psum+=w; } });
+  const bookPeg = psum? pw/psum : null;
+  const pl = priceLabelFromPeg(bookPeg);
+  el('qvVerdict').innerHTML=`
+    <div class="verdict ${ql.c}">
+      <div class="k">Your book — business quality</div>
+      <div class="v">${ql.t}</div>
+      <div class="s">${pQ!=null?(ql.c==='g'?'You mostly own high-return businesses.':ql.c==='a'?'A mix of solid and average businesses.':'Several holdings have weaker fundamentals.'):'No scored holdings.'}</div>
+    </div>
+    <div class="verdict ${pl.c}">
+      <div class="k">Your book — price vs growth (PEG)</div>
+      <div class="v">${pl.t}${bookPeg!=null?` <span style="font-size:.9rem;color:var(--mut)">· avg PEG ${bookPeg>6?'>6':bookPeg.toFixed(1)}</span>`:''}</div>
+      <div class="s">${bookPeg!=null?(pl.c==='g'?'On balance you\u2019re paying less than \u20b91 of price per 1% of growth — good value.':pl.c==='a'?'Roughly fair — price and growth are in line.':'You\u2019re paying up relative to the growth you\u2019re getting.'):'Not enough earnings/growth data to judge.'}</div>
+    </div>`;
+
+  // ---- ranking by PEG ----
+  const assessable = stocks.filter(h=>h._peg.peg!=null).sort((a,b)=>a._peg.peg-b._peg.peg);
+  const declining  = stocks.filter(h=>h._peg.reason==='declining');
+  const notval     = stocks.filter(h=>h._peg.reason==='no-earnings'||h._peg.reason==='no-growth');
+
+  const rowHTML=(h,rank)=>{
+    const w=h.cover, q=qLabel(h.scores.quality);
+    const pr=h._peg, pl=pr.peg!=null?priceLabelFromPeg(pr.peg):pegLabel(pr);
+    const roce=w['CFO To PAT']!=null?`cash conv ${F.num(w['CFO To PAT'],0)}%`:'cash conv —';
+    const pe=w['Price To Earnings']!=null?`P/E ${F.num(w['Price To Earnings'],0)}x`:'P/E —';
+    const gr=pr.g!=null?`growth ${F.num(pr.g,0)}%`:'growth —';
+    const pegTxt = pr.peg!=null ? `<span class="qv-peg">PEG ${pegDisp(pr)}</span>` : `<span class="mut">PEG —</span>`;
+    const take = pl.c==='m'
+      ? (pr.reason==='no-earnings'?'No positive earnings yet, so PEG doesn\u2019t apply — judge it on growth and story.':'Growth data missing — can\u2019t judge price against growth.')
+      : (pr.reason==='declining'?'Earnings are falling, so any positive P/E looks expensive — the growth isn\u2019t there.':qvTakeaway(q.c,pl.c));
+    const rankTxt = rank!=null ? rank : '–';
+    return `<div class="qv-row">
+      <div class="qv-rank ${rank==null?'na':''}">${rankTxt}</div>
+      <div class="stock"><div class="snm">${h.name}</div><div class="snums">${pegTxt} · ${pe} · ${gr} · ${roce} · ${F.num(h.weight,1)}% of book</div></div>
+      <div class="pill"><span class="pl">Business</span><span class="pv ${q.c}">${q.t}</span></div>
+      <div class="pill"><span class="pl">Price/growth</span><span class="pv ${pl.c}">${pl.t}</span></div>
+      <div class="qv-take">${take}</div>
+    </div>`;
+  };
+
+  let html = assessable.map((h,i)=>rowHTML(h,i+1)).join('');
+  html += declining.map(h=>rowHTML(h,null)).join('');
+  html += notval.map(h=>rowHTML(h,null)).join('');
+  el('qvList').innerHTML = html || `<div class="qv-row"><div class="qv-take mut">No covered stocks with disclosed earnings &amp; growth to rank.</div></div>`;
+}
+
+/* ---------- allocation tables + concentration ---------- */
+function renderAllocation(covered,totCur){
+  totCur=totCur||1;
+  // STOCK allocation table (all holdings, largest first)
+  const rows=[...HOLDINGS].sort((a,b)=>(b.weight||0)-(a.weight||0));
+  const maxW=Math.max(...rows.map(h=>h.weight||0),1);
+  el('tblStock').innerHTML=
+    `<tr><th>Stock</th><th>Weight</th><th>Share of book</th><th>Value</th><th>P&L</th></tr>`+
+    rows.map(h=>{
+      const pnlCls=(h.pnl||0)>=0?'pos':'neg';
+      const fillCls=h.covered?'':'v';
+      return `<tr>
+        <td class="al-name">${h.name?h.name.slice(0,26):h.symbol}<span class="sym">${h.symbol||''}${h.covered?'':' · outside'}</span></td>
+        <td class="al-pct">${F.num(h.weight,1)}%</td>
+        <td class="al-bar"><div class="track"><div class="fill ${fillCls}" style="width:${(h.weight||0)/maxW*100}%"></div></div></td>
+        <td class="al-val">${F.inrL(h.cur)}</td>
+        <td class="mono2 ${pnlCls}">${h.pnlPct!=null?F.pct(h.pnlPct,0):'—'}</td>
+      </tr>`;
+    }).join('');
+
+  // SECTOR allocation table
+  const sec={},cnt={};
+  covered.forEach(h=>{const s=h.cover.Industry||'Other';sec[s]=(sec[s]||0)+(h.cur||0);cnt[s]=(cnt[s]||0)+1;});
+  // bucket uncovered value as its own line
+  const uncov=HOLDINGS.filter(h=>!h.covered).reduce((s,h)=>s+(h.cur||0),0);
+  const secArr=Object.entries(sec).sort((a,b)=>b[1]-a[1]);
+  const secSum=secTotal(secArr)+uncov || 1;
+  const maxS=Math.max(...secArr.map(s=>s[1]),uncov,1);
+  let html=`<tr><th>Sector</th><th>Weight</th><th>Share</th><th>Holdings</th><th>Value</th></tr>`+
+    secArr.map(([name,val])=>`<tr>
+      <td class="al-name">${name}</td>
+      <td class="al-pct">${F.num(val/secSum*100,1)}%</td>
+      <td class="al-bar"><div class="track"><div class="fill" style="width:${val/maxS*100}%"></div></div></td>
+      <td class="mono2 mut">${cnt[name]}</td>
+      <td class="al-val">${F.inrL(val)}</td>
+    </tr>`).join('');
+  if(uncov>0) html+=`<tr>
+      <td class="al-name mut">Outside coverage</td>
+      <td class="al-pct mut">${F.num(uncov/secSum*100,1)}%</td>
+      <td class="al-bar"><div class="track"><div class="fill v" style="width:${uncov/maxS*100}%"></div></div></td>
+      <td class="mono2 mut">${HOLDINGS.filter(h=>!h.covered).length}</td>
+      <td class="al-val">${F.inrL(uncov)}</td>
+    </tr>`;
+  el('tblSector').innerHTML=html;
+
+  // CONCENTRATION
+  const w=rows.map(h=>(h.weight||0)/100).filter(x=>x>0);
+  const top=(n)=>rows.slice(0,n).reduce((s,h)=>s+(h.weight||0),0);
+  const hhi=w.reduce((s,x)=>s+x*x,0);
+  const effN=hhi>0?1/hhi:0;
+  const largest=rows[0]||{weight:0,name:'—'};
+  const topSec=secArr[0];
+  const topSecPct=topSec?topSec[1]/secSum*100:0;
+  const concCards=[
+    {k:'Largest position',v:F.num(largest.weight,1)+'%',s:largest.name?largest.name.slice(0,18):''},
+    {k:'Top 5 holdings',v:F.num(top(5),0)+'%',s:'of portfolio value'},
+    {k:'Top 10 holdings',v:F.num(top(10),0)+'%',s:'of portfolio value'},
+    {k:'Effective holdings',v:effN?effN.toFixed(1):'—',s:`across ${rows.length} names`},
+    {k:'Largest sector',v:F.num(topSecPct,0)+'%',s:topSec?topSec[0].slice(0,18):''},
+  ];
+  el('concGrid').innerHTML=concCards.map(c=>`<div class="conc"><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="s">${c.s}</div></div>`).join('');
+
+  // FLAGS
+  const flags=[];
+  if(largest.weight>=25) flags.push({t:'warn',h:`Heavy single-stock bet: <b>${largest.name.slice(0,20)}</b> is ${F.num(largest.weight,0)}% of the book`});
+  else if(largest.weight>=18) flags.push({t:'note',h:`<b>${largest.name.slice(0,20)}</b> is a large position at ${F.num(largest.weight,0)}%`});
+  if(top(5)>=75) flags.push({t:'warn',h:`Concentrated: top 5 holdings are ${F.num(top(5),0)}% of the book`});
+  else if(top(5)<=45 && rows.length>=8) flags.push({t:'ok',h:`Well spread: top 5 are only ${F.num(top(5),0)}%`});
+  if(topSecPct>=40) flags.push({t:'warn',h:`Sector concentration: <b>${topSec[0]}</b> is ${F.num(topSecPct,0)}% of the book`});
+  if(uncov/secSum*100>=30) flags.push({t:'note',h:`${F.num(uncov/secSum*100,0)}% sits outside research coverage`});
+  if(effN&&effN<4) flags.push({t:'warn',h:`Low diversification — effectively ~${effN.toFixed(1)} equal positions`});
+  if(!flags.length) flags.push({t:'ok',h:'No major concentration flags — the book looks reasonably balanced'});
+  el('flagLine').innerHTML=flags.map(f=>`<div class="flag ${f.t}">${f.t==='warn'?'⚠':f.t==='ok'?'✓':'•'} <span>${f.h}</span></div>`).join('');
+}
+function center(big,small){ // doughnut center text plugin config
+  return {plugins:[{id:'ct'+big,afterDraw(c){const{ctx,chartArea:{left,right,top,bottom}}=c;const x=(left+right)/2,y=(top+bottom)/2;
+    ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillStyle='#f0a500';ctx.font='700 26px JetBrains Mono';ctx.fillText(big,x,y-6);
+    ctx.fillStyle='#8494a8';ctx.font='500 11px DM Sans';ctx.fillText(small,x,y+15);ctx.restore();}}]};
+}
+
+/* ---------- holdings cards ---------- */
+let curFilter='all',curSort='weight';
+function renderHoldings(filter,sort){
+  curFilter=filter;curSort=sort;
+  let list=[...HOLDINGS];
+  if(filter==='covered')list=list.filter(h=>h.covered);
+  if(filter==='out')list=list.filter(h=>!h.covered);
+  const statusRank={outperforming:5,accumulating:4,consolidating:3,underperforming:1};
+  list.sort((a,b)=>{
+    if(sort==='weight')return (b.weight||0)-(a.weight||0);
+    if(sort==='pnl')return (b.pnl||-1e15)-(a.pnl||-1e15);
+    if(sort==='score'){const ra=(a.scores&&a.scores.composite)!=null?a.scores.composite:-1;const rb=(b.scores&&b.scores.composite)!=null?b.scores.composite:-1;return rb-ra;}
+    return 0;
+  });
+  el('holdGrid').innerHTML=list.map(hcard).join('');
+  // radar charts
+  list.forEach((h,i)=>{ if(h.covered && h.scores){ drawRadar('rad'+idOf(h,i),h.scores);} });
+}
+const idOf=(h,i)=>(h.symbol||'x')+'_'+i;
+function hcard(h,i){
+  const id=idOf(h,i);
+  const m=h.covered?statusMeta(h.cover):null;
+  const badge = !h.covered ? `<span class="badge b-uncov">Outside coverage</span>`
+    : (m?`<span class="badge ${m.cls}">${m.label}</span>` : `<span class="badge b-uncov">In coverage</span>`);
+  const pnlCls=(h.pnl||0)>=0?'pos':'neg';
+  const w=h.cover;
+  const metrics = (h.covered && !w.isETF) ? `
+    <div class="mrow">
+      ${mcell('P/E',F.x(w['Price To Earnings']))}
+      ${mcell('PEG',w['PEG']!=null?F.num(w['PEG'],2):'—')}
+      ${mcell('EV/EBITDA',w['EV To EBITDA']!=null?F.num(w['EV To EBITDA'],1):'—')}
+      ${mcell('CFO/PAT',pctv(w['CFO To PAT']))}
+      ${mcell('D/E',F.num(w['Debt To Equity'],2))}
+      ${mcell('PAT gr TTM',pctv(w['PAT Growth TTM']))}
+      ${mcell('EPS gr 3Y',pctv(w['EPS Growth 3 Years']))}
+      ${mcell('vs sector 1Y',pctv(w['Returns Vs Industry 1Y']))}
+      ${mcell('Health score',(h.scores&&h.scores.composite!=null)?h.scores.composite:'—')}
+    </div>
+    <div class="hc-radar"><canvas id="rad${id}"></canvas></div>` : '';
+  const smart = (h.covered && !w.isETF) ? smartRow(w) : '';
+  return `
+  <div class="hcard ${h.covered?'':'out'}">
+    <div class="hc-weight" style="width:${Math.min(100,(h.weight||0)*2.2)}%"></div>
+    <div class="hc-top">
+      <div>
+        <div class="hc-name">${h.name||h.symbol}</div>
+        <div class="hc-sym">${h.symbol||''}${w&&w.Industry?' · '+w.Industry:''}</div>
+      </div>
+      ${badge}
+    </div>
+    <div class="pnlrow">
+      <div class="b"><div class="k">Weight</div><div class="v amb">${F.num(h.weight,1)}%</div></div>
+      <div class="b"><div class="k">Current</div><div class="v">${F.inrL(h.cur)}</div></div>
+      <div class="b"><div class="k">P&L</div><div class="v ${pnlCls}">${h.pnl!=null?F.inrL(h.pnl):'—'}${h.pnlPct!=null?` <span style="font-size:.7rem">(${F.pct(h.pnlPct)})</span>`:''}</div></div>
+    </div>
+    <div class="pnlrow" style="margin-bottom:2px">
+      <div class="b"><div class="k">Qty</div><div class="v" style="font-size:.85rem">${h.qty!=null?h.qty:'—'}</div></div>
+      <div class="b"><div class="k">Avg</div><div class="v" style="font-size:.85rem">${F.inr(h.avg)}</div></div>
+      <div class="b"><div class="k">LTP</div><div class="v" style="font-size:.85rem">${F.inr(h.ltp)}</div></div>
+    </div>
+    ${metrics}
+    ${smart}
+    <div class="hc-signal"><span class="tag">Desk read</span>${signalText(h)}</div>
+  </div>`;
+}
+const mcell=(k,v)=>`<div class="m"><div class="k">${k}</div><div class="v ${v==='—'?'na':''}">${v}</div></div>`;
+const pctv=v=>v==null?'—':F.num(v,0)+'%';
+function smartRow(w){
+  const items=[];
+  const push=(lab,v)=>{ if(v!=null) items.push(`<span>${lab} ${v>=0?'▲':'▼'} ${F.pct(Math.abs(v)*(v<0?-1:1),1)}</span>`); };
+  if(w['Promoter Holdings']!=null) items.push(`<span>Promoter ${F.num(w['Promoter Holdings'],0)}%</span>`);
+  push('FII 1Y',w['Change In FII Holdings 1 Year']);
+  push('DII 1Y',w['Change In DII Holdings 1 Year']);
+  return items.length?`<div class="smart">${items.join('')}</div>`:'';
+}
+function drawRadar(cid,sc){
+  const c=document.getElementById(cid); if(!c)return;
+  new Chart(c,{type:'radar',
+    data:{labels:['Quality','Growth','Value','Momentum'],
+      datasets:[{data:[sc.quality,sc.growth,sc.valuation,sc.momentum],
+        backgroundColor:'rgba(240,165,0,.16)',borderColor:COL.amber,pointBackgroundColor:COL.amber,borderWidth:2,pointRadius:2.5}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.label+': '+c.parsed.r}}},
+      scales:{r:{min:0,max:100,ticks:{display:false,stepSize:25},grid:{color:'rgba(38,50,74,.6)'},angleLines:{color:'rgba(38,50,74,.6)'},
+        pointLabels:{font:{size:10},color:'#8494a8'}}}}});
+}
+
+/* ---------- coverage universe (full watchlist, client-facing) ---------- */
+function renderUniverse(){
+  const held=new Set(HOLDINGS.map(h=>normSym(h.symbol||'')));
+  const rows=WATCH.map(w=>{
+    const etf=!!w.isETF;
+    const comp=etf?null:subScores(w).composite;
+    const tier=etf?{label:'Passive fund',cls:'b-uncov'}:tierMeta(comp);
+    const pg=etf?null:pegOf(w);
+    const peg=(pg&&pg.peg!=null)?pegDisp(pg):'—';
+    return {name:w.Name||w.symbol,sym:w.symbol||'',sector:w.Industry||(etf?'ETF / passive':'—'),
+            comp,tier,peg,pe:w['Price To Earnings'],held:held.has(normSym(w.symbol||'')),etf};
+  }).sort((a,b)=>{
+    if(a.etf!==b.etf) return a.etf?1:-1;
+    return (b.comp==null?-1:b.comp)-(a.comp==null?-1:a.comp);
+  });
+  const heldCount=rows.filter(r=>r.held).length;
+  const rowHTML=r=>`<div class="uni-row${r.held?' held':''}">
+      <div class="uni-top">
+        <span class="unm">${r.name} <span class="usym">${r.sym}</span></span>
+        <span class="badge ${r.tier.cls}">${r.tier.label}</span>
+      </div>
+      <div class="uni-meta">
+        <span>${r.sector}</span>
+        <span>Health <b>${r.comp!=null?r.comp:'—'}</b></span>
+        <span>PEG <b>${r.peg}</b></span>
+        <span>P/E <b>${r.pe!=null?F.x(r.pe):'—'}</b></span>
+        ${r.held?'<span class="held-chip">✓ in your portfolio</span>':''}
+      </div>
+    </div>`;
+  el('uniList').innerHTML=rows.map(rowHTML).join('');
+  el('uniSub').textContent=`${WATCH.length} stocks in the R2R research coverage universe (${ASOF}). `
+    +`${heldCount} ${heldCount===1?'is':'are'} in your portfolio — ranked by overall health score.`;
+}
+
+/* ---------- promoter status helpers ---------- */
+function promStatus(w){
+  const ph=w['Promoter Holdings'], d1=w['Change In Promoter Holdings 1 Year'];
+  if(ph!=null && ph<1) return {label:'No promoter',cls:'b-uncov'};   // professionally run / no promoter block
+  if(d1!=null && d1>=0.5)  return {label:'Promoters adding',cls:'b-consol'};
+  if(d1!=null && d1<=-0.5) return {label:'Promoters trimming',cls:'b-accum'};
+  return {label:'Stable',cls:'b-uncov'};
+}
+/* ---------- promoter tab ---------- */
+function renderPromoter(){
+  const held=HOLDINGS.filter(h=>h.covered && h.cover && !h.cover.isETF && h.cover['Promoter Holdings']!=null)
+    .sort((a,b)=>(b.weight||0)-(a.weight||0));
+  const out=HOLDINGS.length-held.length;
+  el('promSub').textContent=`${held.length} of your holdings are inside coverage with promoter data`
+    +(out>0?` · ${out} outside coverage (no promoter data)`:'')+`. As of ${ASOF}.`;
+
+  // summary stats
+  const phs=held.map(h=>h.cover['Promoter Holdings']).filter(x=>x!=null);
+  const avgPH=phs.length?phs.reduce((s,x)=>s+x,0)/phs.length:null;
+  const adding=held.filter(h=>{const d=h.cover['Change In Promoter Holdings 1 Year'];return d!=null&&d>=0.5;}).length;
+  const trimming=held.filter(h=>{const d=h.cover['Change In Promoter Holdings 1 Year'];return d!=null&&d<=-0.5;}).length;
+  const pledged=held.filter(h=>{const p=h.cover['Pledged Percentage 1 Year Back'];return p!=null&&p>0;}).length;
+  const stats=[
+    {lab:'Avg promoter stake',val:avgPH!=null?F.num(avgPH,1)+'%':'—',sub:'across covered holdings'},
+    {lab:'Promoters adding',val:adding,sub:'stake up over 1Y',col:'var(--emerald)'},
+    {lab:'Promoters trimming',val:trimming,sub:'stake down over 1Y',col:'var(--amber)'},
+    {lab:'With pledging',val:pledged,sub:pledged?'shares pledged — watch':'none pledged',col:pledged?'var(--red)':'var(--emerald)'},
+  ];
+  el('promStats').innerHTML=stats.map(s=>`<div class="mini-stat"><div class="ms-lab">${s.lab}</div>`
+    +`<div class="ms-val" style="color:${s.col||'var(--txt)'}">${s.val}</div><div class="ms-sub">${s.sub}</div></div>`).join('');
+
+  // list
+  el('promList').innerHTML = held.length ? held.map(h=>{
+    const w=h.cover, st=promStatus(w);
+    const ph=w['Promoter Holdings'], d1=w['Change In Promoter Holdings 1 Year'];
+    const dq=w['Change In Promoter Holdings Latest Quarter'], d3=w['Change In Promoter Holdings 3 Years'];
+    const pl=w['Pledged Percentage 1 Year Back'];
+    const chg=(v)=> v==null?'<b>—</b>':`<b class="${v>=0?'up':'dn'}">${F.pct(v,2)}</b>`;
+    return `<div class="uni-row held">
+      <div class="uni-top">
+        <span class="unm">${h.name} <span class="usym">${h.symbol}</span></span>
+        <span class="badge ${st.cls}">${st.label}</span>
+      </div>
+      <div class="pr-metrics">
+        <span>Promoter <b>${ph!=null?F.num(ph,1)+'%':'—'}</b></span>
+        <span>Δ 1Y ${chg(d1)}</span>
+        <span>Δ Qtr ${chg(dq)}</span>
+        <span>Δ 3Y ${chg(d3)}</span>
+        ${(pl!=null&&pl>0)?`<span class="pledge-chip">⚠ ${F.num(pl,1)}% pledged</span>`:''}
+      </div>
+    </div>`;
+  }).join('') : `<div class="ema-empty">None of your holdings are inside coverage with promoter data.</div>`;
+}
+/* ---------- 40W EMA helpers + tab ---------- */
+function emaStat(w){
+  const cp=w['Close Price'], e=w['EMA 40W'];
+  if(cp==null||e==null||e<=0) return null;
+  return {above:cp>=e, dist:(cp-e)/e*100};
+}
+function renderEMA(){
+  const held=HOLDINGS.filter(h=>h.covered && h.cover && !h.cover.isETF && emaStat(h.cover));
+  const out=HOLDINGS.length-held.length;
+  el('emaSub').textContent=`${held.length} of your holdings have a 40W EMA reading in coverage`
+    +(out>0?` · ${out} outside coverage / no reading`:'')+`. As of ${ASOF}.`;
+
+  // client book split (by value)
+  const hAbove=held.filter(h=>emaStat(h.cover).above), hBelow=held.filter(h=>!emaStat(h.cover).above);
+  const valAbove=hAbove.reduce((s,h)=>s+(h.cur||0),0), valBelow=hBelow.reduce((s,h)=>s+(h.cur||0),0);
+  const valTot=(valAbove+valBelow)||1;
+  // universe split (by count)
+  const uni=WATCH.filter(w=>!w.isETF && emaStat(w));
+  const uAbove=uni.filter(w=>emaStat(w).above).length, uBelow=uni.length-uAbove;
+
+  const stats=[
+    {lab:'Above 40W EMA',val:hAbove.length,sub:`${F.num(valAbove/valTot*100,0)}% of covered value`,col:'var(--emerald)'},
+    {lab:'Below 40W EMA',val:hBelow.length,sub:`${F.num(valBelow/valTot*100,0)}% of covered value`,col:'var(--red)'},
+    {lab:'Universe above',val:`${uAbove}/${uni.length}`,sub:'covered stocks in uptrend',col:'var(--emerald)'},
+    {lab:'Universe below',val:`${uBelow}/${uni.length}`,sub:'covered stocks in downtrend',col:'var(--red)'},
+  ];
+  el('emaStats').innerHTML=stats.map(s=>`<div class="mini-stat"><div class="ms-lab">${s.lab}</div>`
+    +`<div class="ms-val" style="color:${s.col}">${s.val}</div><div class="ms-sub">${s.sub}</div></div>`).join('');
+
+  // split lists
+  const itemHTML=(nm,sym,dist,held)=>`<div class="ema-item">
+      <span class="ei-nm ${held?'held-mark':''}">${nm}<span class="ei-sym">${sym}</span></span>
+      <span class="ei-d ${dist>=0?'up':'dn'}">${F.pct(dist,1)}</span></div>`;
+  const colHTML=(arr,side)=> arr.length
+    ? arr.map(x=>itemHTML(x.nm,x.sym,x.dist,x.held)).join('')
+    : `<div class="ema-empty">Nothing here.</div>`;
+
+  // your holdings
+  const ha=hAbove.map(h=>({nm:h.name,sym:h.symbol,dist:emaStat(h.cover).dist,held:true})).sort((a,b)=>b.dist-a.dist);
+  const hb=hBelow.map(h=>({nm:h.name,sym:h.symbol,dist:emaStat(h.cover).dist,held:true})).sort((a,b)=>a.dist-b.dist);
+  el('emaSplitHold').innerHTML=`
+    <div class="ema-col above"><h4>▲ Above 40W EMA <span style="color:var(--mut);font-weight:500">(${ha.length})</span></h4>
+      <div class="ec-sub">Longer-term uptrend</div>${colHTML(ha)}</div>
+    <div class="ema-col below"><h4>▼ Below 40W EMA <span style="color:var(--mut);font-weight:500">(${hb.length})</span></h4>
+      <div class="ec-sub">Longer-term downtrend</div>${colHTML(hb)}</div>`;
+
+  // full universe
+  const heldSet=new Set(HOLDINGS.map(h=>normSym(h.symbol||'')));
+  const uRows=uni.map(w=>({nm:w.Name||w.symbol,sym:w.symbol||'',dist:emaStat(w).dist,
+    above:emaStat(w).above,held:heldSet.has(normSym(w.symbol||''))}));
+  const ua=uRows.filter(r=>r.above).sort((a,b)=>b.dist-a.dist);
+  const ub=uRows.filter(r=>!r.above).sort((a,b)=>a.dist-b.dist);
+  el('emaSplitUni').innerHTML=`
+    <div class="ema-col above"><h4>▲ Above 40W EMA <span style="color:var(--mut);font-weight:500">(${ua.length})</span></h4>
+      <div class="ec-sub">Longer-term uptrend</div>${colHTML(ua)}</div>
+    <div class="ema-col below"><h4>▼ Below 40W EMA <span style="color:var(--mut);font-weight:500">(${ub.length})</span></h4>
+      <div class="ec-sub">Longer-term downtrend</div>${colHTML(ub)}</div>`;
+
+  return {hAbove,hBelow,valAbove,valBelow,uAbove,uBelow};
+}
+
+
+/* ---------- horizontal tabbed section view ---------- */
+let TAB_I=0, TAB_SECS=[], TAB_LINKS=[];
+
+function setTabH(){
+  const top=document.querySelector('.topbar');
+  const sub=document.querySelector('.subnav');
+  const tp =document.getElementById('tabpager');
+  const used=(top?top.offsetHeight:62)+(sub?sub.offsetHeight:48)+(tp?tp.offsetHeight:44);
+  const h=Math.max(340, window.innerHeight - used - 6);
+  document.documentElement.style.setProperty('--tabh', h+'px');
+}
+
+function resizeTabCharts(){
+  Object.values(CHARTS).forEach(c=>{ try{ c.resize(); }catch(e){} });
+}
+
+function goTab(i){
+  if(!TAB_SECS.length) return;
+  i=Math.max(0, Math.min(TAB_SECS.length-1, i));
+  TAB_I=i;
+  const track=document.getElementById('tabTrack');
+  // percentage translate: the track is exactly one viewport wide, so -i*100%
+  // always lands the i-th panel dead-on, on any screen size, with no measurement.
+  track.style.transform='translateX(-'+(i*100)+'%)';
+  TAB_LINKS.forEach((l,k)=>l.classList.toggle('on', k===i));
+  TAB_SECS.forEach((s,k)=>{ s.classList.toggle('tab-live', k===i); s.scrollTop=0; });
+  const title=TAB_LINKS[i]?TAB_LINKS[i].textContent.trim():'';
+  const pt=document.getElementById('pgTitle'); if(pt)pt.textContent=title;
+  const pc=document.getElementById('pgCount'); if(pc)pc.textContent=String(i+1).padStart(2,'0')+' / '+String(TAB_SECS.length).padStart(2,'0');
+  const pv=document.getElementById('pgPrev');  if(pv)pv.disabled=(i===0);
+  const nx=document.getElementById('pgNext');  if(nx)nx.disabled=(i===TAB_SECS.length-1);
+  // keep the active tab centered in the horizontally-scrollable subnav —
+  // scroll ONLY the subnav, never the page or panel (avoids vertical jumps)
+  const nav=document.querySelector('.subnav'); const link=TAB_LINKS[i];
+  if(nav && link){ const target=link.offsetLeft - (nav.clientWidth/2) + (link.clientWidth/2);
+    try{ nav.scrollTo({left:Math.max(0,target),behavior:'smooth'}); }catch(e){ nav.scrollLeft=Math.max(0,target); } }
+  // charts built in an off-screen panel need a nudge once they're on-screen
+  requestAnimationFrame(resizeTabCharts);
+  setTimeout(resizeTabCharts, 380);   // again after the slide settles
+}
+
+function initTabs(){
+  TAB_LINKS=[...document.querySelectorAll('.subnav a')];
+  TAB_SECS =TAB_LINKS.map(l=>document.querySelector(l.getAttribute('href'))).filter(Boolean);
+  document.body.style.paddingBottom='0';   // sections scroll internally now
+  setTabH();
+
+  TAB_LINKS.forEach((l,i)=>{ l.onclick=e=>{ e.preventDefault(); goTab(i); }; });
+  const pv=document.getElementById('pgPrev'), nx=document.getElementById('pgNext');
+  if(pv)pv.onclick=()=>goTab(TAB_I-1);
+  if(nx)nx.onclick=()=>goTab(TAB_I+1);
+
+  // keyboard arrows (desktop) — ignore while typing or with the modal open
+  if(!initTabs._kb){ initTabs._kb=true;
+    document.addEventListener('keydown',e=>{
+      const app=document.getElementById('app');
+      if(!app||app.style.display==='none') return;
+      const m=document.getElementById('modal');
+      if(m&&m.classList.contains('on')) return;
+      const tag=(e.target.tagName||'').toLowerCase();
+      if(tag==='input'||tag==='textarea') return;
+      if(e.key==='ArrowRight') goTab(TAB_I+1);
+      else if(e.key==='ArrowLeft') goTab(TAB_I-1);
+    });
+  }
+
+  // swipe (mobile) — only fire when the gesture is clearly horizontal, so
+  // vertical scrolling inside a tall panel is never hijacked
+  const vp=document.getElementById('tabViewport');
+  if(vp&&!vp._swipe){ vp._swipe=true;
+    let x0=0,y0=0,active=false;
+    vp.addEventListener('touchstart',e=>{ const t=e.touches[0]; x0=t.clientX; y0=t.clientY; active=true; },{passive:true});
+    vp.addEventListener('touchend',e=>{
+      if(!active) return; active=false;
+      const t=e.changedTouches&&e.changedTouches[0]; if(!t) return;
+      const dx=t.clientX-x0, dy=t.clientY-y0;
+      if(Math.abs(dx)>55 && Math.abs(dx)>Math.abs(dy)*1.4){ goTab(TAB_I + (dx<0?1:-1)); }
+    },{passive:true});
+  }
+
+  // keep sizing correct across resize / rotate. The percentage translate
+  // auto-tracks the new width, so we only refresh height + chart sizes
+  // (no goTab → the user's scroll position within the tab is preserved).
+  if(!initTabs._rz){ initTabs._rz=true;
+    let rt;
+    window.addEventListener('resize',()=>{ clearTimeout(rt); rt=setTimeout(()=>{ setTabH(); resizeTabCharts(); },120); });
+    window.addEventListener('orientationchange',()=>setTimeout(()=>{ setTabH(); resizeTabCharts(); },260));
+  }
+
+  goTab(0);
+}
+
+/* ============================================================
+   COVERAGE REFRESH (in-browser merge of Tickertape CSVs)
+   ============================================================ */
+let covBuffer=null;
+function mergeTickertapeCSVs(files,cb){
+  let pending=files.length; const master={};
+  files.forEach(f=>Papa.parse(f,{header:true,skipEmptyLines:true,complete:res=>{
+    res.data.forEach(row=>{
+      const cid=(row.companyId||'').trim(); if(!cid)return;
+      const rec=master[cid]||(master[cid]={companyId:cid});
+      Object.entries(row).forEach(([k,v])=>{
+        k=k.trim(); if(k==='companyId')return;
+        let val=(v==null?'':String(v).trim());
+        if(['null','nan','','-'].includes(val.toLowerCase()))return;
+        if(!['Name','Industry','Status'].includes(k)){const n=parseFloat(val.replace(/,/g,''));if(!isNaN(n))val=n;}
+        rec[k]=val;
+      });
+    });
+    if(--pending===0){
+      const arr=Object.values(master).map(rec=>{
+        const [exch,sym]=rec.companyId.includes(':')?rec.companyId.split(':'):['',rec.companyId];
+        rec.symbol=sym;rec.exchange=exch;
+        const nm=(rec.Name||'').toLowerCase();
+        rec.isETF=nm.includes('etf')||(rec['Price To Earnings']==null&&rec['PEG']==null&&rec.Industry==null);
+        return rec;
+      });
+      cb(arr);
+    }
+  }}));
+}
+
+/* ---------- live coverage: parse CSV text + fetch remote coverage.csv ---------- */
+function recordsFromCsvText(text){
+  const res=Papa.parse(text,{header:true,skipEmptyLines:true});
+  const master={};
+  (res.data||[]).forEach(row=>{
+    const cid=(row.companyId||'').trim(); if(!cid)return;
+    const rec=master[cid]||(master[cid]={companyId:cid});
+    Object.entries(row).forEach(([k,v])=>{
+      k=k.trim(); if(k==='companyId')return;
+      let val=(v==null?'':String(v).trim());
+      if(['null','nan','','-'].includes(val.toLowerCase()))return;
+      if(!['Name','Industry','Status'].includes(k)){const n=parseFloat(val.replace(/,/g,''));if(!isNaN(n))val=n;}
+      rec[k]=val;
+    });
+  });
+  return Object.values(master).map(rec=>{
+    const [exch,sym]=rec.companyId.includes(':')?rec.companyId.split(':'):['',rec.companyId];
+    rec.symbol=sym;rec.exchange=exch;
+    const nm=(rec.Name||'').toLowerCase();
+    rec.isETF=nm.includes('etf')||(rec['Price To Earnings']==null&&rec['PEG']==null&&rec.Industry==null);
+    return rec;
+  });
+}
+async function loadRemoteCoverage(){
+  try{
+    const res=await fetch(COVERAGE_URL+'?v='+Date.now(),{cache:'no-store'});
+    if(!res.ok) return false;
+    const text=await res.text();
+    if(!/companyId/i.test(text)) return false;         // not a valid coverage file
+    const recs=recordsFromCsvText(text);
+    if(!recs.length) return false;
+    WATCH=recs;
+    const lm=res.headers.get('last-modified');
+    ASOF = lm ? ('live · updated '+new Date(lm).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}))
+              : 'live coverage';
+    buildLookup();
+    document.getElementById('asofTop').innerHTML="Coverage: <b>"+ASOF+"</b>";
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ============================================================
+   SHAREABLE LINK  (portfolio encoded in URL fragment)
+   ============================================================ */
+function toast(msg,cls){
+  const t=document.getElementById('toast');
+  t.innerHTML=(cls?`<span class="${cls}">●</span> `:'')+msg;
+  t.classList.add('on'); clearTimeout(t._t);
+  t._t=setTimeout(()=>t.classList.remove('on'),3200);
+}
+// base64url helpers (UTF-8 safe, for the legacy uncompressed path)
+const b64u = {
+  enc: s => btoa(unescape(encodeURIComponent(s))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,''),
+  dec: s => decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/'))))
+};
+// binary-safe base64url (for compressed bytes)
+function bytesToB64u(bytes){
+  let bin=''; const CH=0x8000;
+  for(let i=0;i<bytes.length;i+=CH){ bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+CH)); }
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function b64uToBytes(s){
+  s=s.replace(/-/g,'+').replace(/_/g,'/');
+  const pad=s.length%4?'='.repeat(4-s.length%4):'';
+  const bin=atob(s+pad), out=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+// deflate/inflate via the browser's Compression Streams API (no dependency)
+const CAN_COMPRESS = (typeof CompressionStream==='function' && typeof DecompressionStream==='function');
+async function deflate(str){
+  const cs=new CompressionStream('deflate-raw'); const w=cs.writable.getWriter();
+  w.write(new TextEncoder().encode(str)); w.close();
+  const buf=await new Response(cs.readable).arrayBuffer();
+  return bytesToB64u(new Uint8Array(buf));
+}
+async function inflate(b64){
+  const ds=new DecompressionStream('deflate-raw'); const w=ds.writable.getWriter();
+  w.write(b64uToBytes(b64)); w.close();
+  const buf=await new Response(ds.readable).arrayBuffer();
+  return new TextDecoder().decode(buf);
+}
+
+const r6 = n => (n==null||isNaN(n))?null:Math.round(n*100)/100;
+function buildPayloadJSON(){
+  // minimal per-holding tuple: [symbol, name(if uncovered), isin, qty, avg, ltp, cur, pnl]
+  const h = HOLDINGS.map(x=>[
+    x.symbol||'', x.covered?'':(x.name||''), x.isin||'',
+    r6(x.qty), r6(x.avg), r6(x.ltp), r6(x.cur), r6(x.pnl)
+  ]);
+  return JSON.stringify({v:1, f:CUR_FNAME, h});
+}
+// Returns the fragment body. Uses compressed 'z=' when it's actually shorter,
+// otherwise falls back to the legacy 'p=' so a link is never longer than before.
+async function encodePortfolio(){
+  const json = buildPayloadJSON();
+  const legacy = 'p='+b64u.enc(json);
+  if(CAN_COMPRESS){
+    try{
+      const z = 'z='+await deflate(json);
+      if(z.length < legacy.length) return z;
+    }catch(e){ /* fall back to legacy below */ }
+  }
+  return legacy;
+}
+async function decodePortfolio(frag){
+  const m = (frag||'').match(/(?:^#?|[#&])(z|p)=([^&]*)/);
+  if(!m) throw new Error('no payload');
+  const json = m[1]==='z' ? await inflate(m[2]) : b64u.dec(m[2]);
+  const obj = JSON.parse(json);
+  if(!obj.h || !Array.isArray(obj.h)) throw new Error('bad payload');
+  const rows = obj.h.map(t=>({
+    rawSym:t[0]||null, rawName:t[1]||null, isin:t[2]||null,
+    qty:t[3], avg:t[4], ltp:t[5], cur:t[6], pnl:t[7]
+  }));
+  HOLDINGS = joinAndDerive(rows);
+  return obj.f || 'shared portfolio';
+}
+async function makeShareLink(){
+  const btn=document.getElementById('btnShare');
+  btn.disabled=true;
+  try{
+    const enc = await encodePortfolio();
+    const url = location.origin + location.pathname + '#' + enc;
+    if(url.length > 12000){
+      toast('This portfolio is large — the link may be too long for some apps. Use Download PDF, or ask your desk for a hosted copy.','warn');
+    }
+    // update address bar (so refresh keeps the view) without reloading
+    history.replaceState(null,'',url);
+    copyText(url);
+  }catch(e){
+    toast('Couldn\'t build the link — try again, or use Download PDF.','warn');
+  }finally{ btn.disabled=false; }
+}
+function copyText(text){
+  const done=()=>toast('Shareable link copied — send it to your client','ok');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done).catch(()=>fallbackCopy(text,done));
+  } else fallbackCopy(text,done);
+}
+function fallbackCopy(text,done){
+  const i=document.getElementById('clipHelper');
+  i.value=text; i.select(); i.setSelectionRange(0,99999);
+  try{document.execCommand('copy'); done();}
+  catch(e){ toast('Couldn\'t auto-copy — the link is in your address bar to copy manually','warn'); }
+}
+async function checkSharedLink(){
+  const hash = location.hash || '';
+  if(!/[#&](z|p)=/.test(hash)) return false;
+  try{
+    const fname = await decodePortfolio(hash);
+    SHARED = true;
+    document.getElementById('sharedBanner').style.display='block';
+    renderApp(fname);
+    return true;
+  }catch(e){
+    toast('This shared link looks broken or incomplete.','warn');
+    return false;
+  }
+}
+
+/* ============================================================
+   EVENTS
+   ============================================================ */
+const drop=document.getElementById('drop'),fi=document.getElementById('fileInput');
+drop.onclick=()=>fi.click();
+fi.onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0]);};
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+document.getElementById('btnNew').onclick=()=>{history.replaceState(null,'',location.pathname);location.reload();};
+document.getElementById('btnPdf').onclick=()=>window.print();
+document.getElementById('btnShare').onclick=makeShareLink;
+
+document.getElementById('segFilter').onclick=e=>{if(e.target.dataset.f){[...e.currentTarget.children].forEach(b=>b.classList.remove('on'));e.target.classList.add('on');renderHoldings(e.target.dataset.f,curSort);}};
+document.getElementById('segSort').onclick=e=>{if(e.target.dataset.s){[...e.currentTarget.children].forEach(b=>b.classList.remove('on'));e.target.classList.add('on');renderHoldings(curFilter,e.target.dataset.s);}};
+
+// coverage modal
+const modal=document.getElementById('modal');
+document.getElementById('btnCoverage').onclick=()=>{modal.classList.add('on');document.getElementById('covDate').value=ASOF;document.getElementById('covStatus').textContent='';covBuffer=null;};
+document.getElementById('covClose').onclick=()=>modal.classList.remove('on');
+modal.addEventListener('click',e=>{if(e.target===modal)modal.classList.remove('on');});
+const covDrop=document.getElementById('covDrop'),covInput=document.getElementById('covInput');
+covDrop.onclick=()=>covInput.click();
+covInput.onchange=e=>ingestCov(e.target.files);
+['dragover','dragenter'].forEach(ev=>covDrop.addEventListener(ev,e=>{e.preventDefault();covDrop.style.borderColor='#f0a500';}));
+covDrop.addEventListener('drop',e=>{e.preventDefault();ingestCov(e.dataTransfer.files);});
+function ingestCov(files){
+  const arr=[...files].filter(f=>f.name.toLowerCase().endsWith('.csv'));
+  if(!arr.length){document.getElementById('covStatus').textContent='Please drop .csv files.';return;}
+  document.getElementById('covStatus').style.color='#8494a8';
+  document.getElementById('covStatus').textContent='Merging '+arr.length+' file(s)…';
+  mergeTickertapeCSVs(arr,merged=>{covBuffer=merged;
+    document.getElementById('covStatus').style.color='#2ecc71';
+    document.getElementById('covStatus').textContent='✓ '+merged.length+' stocks ready. Click Save coverage.';});
+}
+document.getElementById('covSave').onclick=()=>{
+  if(!covBuffer){document.getElementById('covStatus').textContent='Drop the CSV files first.';return;}
+  const d=document.getElementById('covDate').value.trim()||ASOF;
+  try{localStorage.setItem('r2r_watchlist',JSON.stringify(covBuffer));localStorage.setItem('r2r_asof',d);}catch(e){}
+  WATCH=covBuffer;ASOF=d;buildLookup();
+  document.getElementById('asofTop').innerHTML="Coverage: <b>"+ASOF+"</b>";
+  modal.classList.remove('on');
+  if(HOLDINGS.length){HOLDINGS=joinAndDerive(HOLDINGS.map(h=>({rawSym:h.symbol,rawName:h.name,isin:h.isin,qty:h.qty,avg:h.avg,ltp:h.ltp,cur:h.cur,pnl:h.pnl})));renderApp(document.getElementById('coverMeta').textContent.split('Source file: ')[1]||'file');}
+};
+document.getElementById('covReset').onclick=()=>{
+  localStorage.removeItem('r2r_watchlist');localStorage.removeItem('r2r_asof');
+  WATCH=DEFAULT_WATCHLIST;ASOF=DEFAULT_ASOF;buildLookup();
+  document.getElementById('asofTop').innerHTML="Coverage: <b>"+ASOF+"</b>";
+  document.getElementById('covStatus').style.color='#2ecc71';
+  document.getElementById('covStatus').textContent='✓ Reset to built-in coverage ('+WATCH.length+' stocks).';
+};
+
+/* ---------- init ---------- */
+(async function init(){
+  let remote=false;
+  try{ remote=await loadRemoteCoverage(); }catch(e){ remote=false; }
+  if(!remote) loadCoverage();          // fallback: this browser's saved coverage, else built-in
+  await checkSharedLink();
+})();
+</script>
+</body>
+</html>
